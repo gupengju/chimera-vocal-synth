@@ -7,7 +7,7 @@ import { sameBody } from "../body.ts";
 import { useStore } from "../store.ts";
 import { VoiceModel } from "../analysis.ts";
 import { useModel } from "../useModel.ts";
-import { V } from "../colors.ts";
+import { C, V } from "../colors.ts";
 import type { HumanArtic, HumanFrame } from "../../wasm/types.ts";
 import type { TelemetryMessage } from "../../worklet/protocol.ts";
 
@@ -107,7 +107,7 @@ export function AnatomyView(props: { slots?: SlotsFn; info?: InfoFn; showFormant
         const clean = recording.on;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalCompositeOperation = "source-over";
-        ctx.fillStyle = "#000";
+        ctx.fillStyle = C.console;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const view = clean ? { ...st.view, calipers: false, grid: false } : st.view;

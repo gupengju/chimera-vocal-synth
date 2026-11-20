@@ -3,7 +3,7 @@
  * heart outlines float up beside it, as if it likes it. The view feeds the pointer's path over the
  * crown (in cm on the head, so it doesn't matter how big the head is drawn) and draws the hearts.
  */
-import { V } from "../colors.ts";
+import { V, blendMode } from "../colors.ts";
 
 /** path over the crown (cm) that makes a head happy from rest, less what fades meanwhile: an
  *  ordinary wiggle (30 cm/s on the head: a mouse at ~700 px/s over a desktop head) gets there in
@@ -79,7 +79,7 @@ export class Petting {
 export function heart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string, alpha: number): void {
   if (alpha <= 0 || size <= 0) return;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = blendMode();
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1.2, size / 16);

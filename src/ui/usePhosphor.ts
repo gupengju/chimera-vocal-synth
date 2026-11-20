@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Glow } from "./render/vector.ts";
+import { C } from "./colors.ts";
 import type { CanvasFrame } from "./useCanvas.ts";
 
 /**
@@ -38,7 +39,7 @@ export function usePhosphor(draw: (f: CanvasFrame) => void, opts: { sigma?: numb
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = 1;
-        ctx.fillStyle = "#000";
+        ctx.fillStyle = C.console;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         drawRef.current({ ctx, w, h, dpr, dt, now });

@@ -6,7 +6,7 @@
  * face screens leave out their measurements (`recording`), so what you see is what you get.
  */
 import { label } from "../ui/render/vector.ts";
-import { V } from "../ui/colors.ts";
+import { C, V } from "../ui/colors.ts";
 
 const W = 720, H = 1280;
 /** the band at the foot that holds the wordmark */
@@ -67,7 +67,7 @@ export class Clip {
     const draw = () => {
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1;
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = C.console;
       ctx.fillRect(0, 0, W, H);
       const src = source();
       const sw = src?.width ?? 0, sh = src?.height ?? 0;

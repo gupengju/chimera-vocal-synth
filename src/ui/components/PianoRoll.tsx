@@ -3,7 +3,7 @@ import { usePhosphor } from "../usePhosphor.ts";
 import { engine } from "../../audio/AudioEngine.ts";
 import { useStore } from "../store.ts";
 import { roll, tickSinging } from "../singing.ts";
-import { TEXT, V } from "../colors.ts";
+import { TEXT, V, blendMode } from "../colors.ts";
 import { beam, beamPts, label, labelWidth, seg, type Pt } from "../render/vector.ts";
 import { nearestBody } from "../body.ts";
 
@@ -88,7 +88,7 @@ export function PianoRoll() {
       r.rect(x0, yc - barH / 2, x1 - x0, barH);
       if (live) {
         ctx.save();
-        ctx.globalCompositeOperation = "lighter";
+        ctx.globalCompositeOperation = blendMode();
         ctx.fillStyle = "rgba(91, 227, 129, 0.12)";
         ctx.fill(r);
         ctx.restore();

@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { useStore } from "./store.ts";
+import { getTheme, subscribeTheme, toggleTheme } from "./theme.ts";
 import { engine } from "../audio/AudioEngine.ts";
 import { AnatomyView } from "./components/AnatomyView.tsx";
 import { TubeView } from "./components/TubeView.tsx";
@@ -63,6 +64,7 @@ function TopBar() {
         ]}
       />
       <div className="topbar-right">
+        <ThemeToggle />
         <label className="volume">
           <span>Volume</span>
           <input type="range" min={0} max={1} step={0.01} value={volume} onChange={(e) => setVolume(Number(e.target.value))} style={{ "--pos": `${volume * 100}%` } as React.CSSProperties} />
@@ -82,6 +84,31 @@ function TopBar() {
         </a>
       </div>
     </header>
+  );
+}
+
+/** Sun/moon button flipping between the dark vector screen and the light theme. */
+function ThemeToggle() {
+  const theme = useSyncExternalStore(subscribeTheme, getTheme);
+  const light = theme === "light";
+  return (
+    <button type="button" className="theme-toggle" onClick={toggleTheme} title={light ? "Switch to dark theme" : "Switch to light theme"} aria-label={light ? "Switch to dark theme" : "Switch to light theme"}>
+      {light ? (
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+          <path fill="currentColor" d="M9.59 0a8 8 0 105.66 13.66A9 9 0 019.59 0z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M8 12a4 4 0 110-8 4 4 0 010 8zm0-1.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 0v2M8 14v2M16 8h-2M2 8H0M13.66 2.34l-1.42 1.42M3.76 12.24l-1.42 1.42M13.66 13.66l-1.42-1.42M3.76 3.76L2.34 2.34"
+            stroke="currentColor"
+            strokeWidth="1.1"
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
+    </button>
   );
 }
 

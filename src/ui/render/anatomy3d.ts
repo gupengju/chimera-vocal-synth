@@ -20,7 +20,8 @@ import type { HumanArtic, HumanFrame } from "../../wasm/types.ts";
 import { NEUTRAL } from "../../wasm/engine.ts";
 import type { TelemetryMessage } from "../../worklet/protocol.ts";
 import type { VoiceModel } from "../analysis.ts";
-import { V, heat, pressureLevel } from "../colors.ts";
+import { V, heat, pressureLevel, PALETTES } from "../colors.ts";
+import { getTheme, type Theme } from "../theme.ts";
 import { catmullRom, rotateAbout, type Vec } from "./geom.ts";
 import { chaikin, type Pt } from "./vector.ts";
 import { Beams, Poly } from "./beams3d.ts";
@@ -191,10 +192,16 @@ class Lines {
 interface Group {
   lines: Float32Array[];
   color: string;
+  /** palette key of color, so the group is repainted in the live theme each frame */
+  key: keyof typeof V;
   width: number;
   alpha: number;
   hot?: boolean;
 }
+
+/** dark-theme value → palette key, used while building the rest-pose groups */
+const DARK_KEY = new Map<string, keyof typeof V>();
+for (const [key, val] of Object.entries(PALETTES.dark.V)) DARK_KEY.set(val, key as keyof typeof V);
 
 /** a polyline whose points the jaw carries by weight w (the lower face's skin), and the cheeks' puff by c */
 interface Skinned {
@@ -395,7 +402,7 @@ function buildRest(model: VoiceModel): Rest {
   const group = (into: Group[], color: string, width: number, alpha: number, fill: (L: Lines) => void, hot = false) => {
     const L = new Lines();
     fill(L);
-    into.push({ lines: L.lines, color, width, alpha, hot });
+    into.push({ lines: L.lines, color, key: DARK_KEY.get(color)!, width, alpha, hot });
   };
   /** a template outline on the side of the head, standing out from it by `off` (body cm) */
   const onSide = (L: Lines, pts: [number, number][], off: (i: number, n: number) => number, side: number) => {
@@ -768,6 +775,7 @@ export class Anatomy3D {
     // dim with depth: full brightness up to just in front of the head's middle
     const dist = this.camera.position.distanceTo(rest.center);
     const fog = this.scene.fog as THREE.Fog;
+    fog.color.set(PALETTES[getTheme() as Theme].c.console);
     fog.near = dist - 3 * k;
     fog.far = dist + 30 * k;
 
@@ -792,7 +800,7 @@ export class Anatomy3D {
     this.k = k;
 
     // ---- the fixed and jaw-carried structures
-    for (const g of rest.fixed) for (const l of g.lines) B.line(l, l.length / 3, g.color, g.width, { alpha: g.alpha, hot: g.hot });
+    for (const g of rest.fixed) for (const l of g.lines) B.line(l, l.length / 3, V[g.key], g.width, { alpha: g.alpha, hot: g.hot });
     for (const g of rest.jaw) {
       for (const l of g.lines) {
         const P = this.tmp.reset();
@@ -800,7 +808,7 @@ export class Anatomy3D {
           const [x, y] = rot(l[i], l[i + 1], phi);
           P.p(x, y, l[i + 2]);
         }
-        B.poly(P, g.color, g.width, { alpha: g.alpha, hot: g.hot });
+        B.poly(P, V[g.key], g.width, { alpha: g.alpha, hot: g.hot });
       }
     }
     for (const sk of rest.shell) {
@@ -1196,7 +1204,7 @@ export class Anatomy3D {
       if (!pos) continue;
       if (Number.isFinite(p.px)) {
         const band = Math.min(2, Math.floor(Math.min(1, Math.abs(vis) / 6) * Math.min(1, p.life) * 3));
-        this.beams.seg(p.px, p.py, p.pz, pos[0], pos[1], pos[2], "#ffe2a8", 1.05, 0.16 + 0.2 * band);
+        this.beams.seg(p.px, p.py, p.pz, pos[0], pos[1], pos[2], getTheme() === "light" ? V.amber : "#ffe2a8", 1.05, 0.16 + 0.2 * band);
       }
       [p.px, p.py, p.pz] = pos;
     }
@@ -1215,7 +1223,7 @@ export class Anatomy3D {
       const pos = this.airPoint(f, s + 0.2 + rnd() * 1.2, rnd() * 2 - 1, rnd() * 2 - 1);
       if (!pos) continue;
       const r = 0.02 + rnd() * 0.05;
-      this.beams.seg(pos[0] - r, pos[1], pos[2], pos[0] + r, pos[1], pos[2], "#f4fbff", 1.6, 0.15 + 0.7 * intensity * rnd());
+      this.beams.seg(pos[0] - r, pos[1], pos[2], pos[0] + r, pos[1], pos[2], getTheme() === "light" ? V.white : "#f4fbff", 1.6, 0.15 + 0.7 * intensity * rnd());
     }
   }
 

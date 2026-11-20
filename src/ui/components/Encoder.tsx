@@ -1,5 +1,6 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { SLOTS } from "../colors.ts";
+import { getTheme, subscribeTheme } from "../theme.ts";
 
 export interface EncoderSpec {
   label: string;
@@ -26,6 +27,8 @@ const SPAN = (270 * Math.PI) / 180;
 export function Encoder(props: EncoderSpec & { slot: number }) {
   const { label, value, min, max, log, onChange, format, slot } = props;
   const id = useId();
+  // re-render on theme toggle so the slot colour is re-read from the live palette
+  useSyncExternalStore(subscribeTheme, getTheme);
   const color = SLOTS[slot % 4];
   const toPos = (v: number) => (log ? (Math.log(v) - Math.log(min)) / (Math.log(max) - Math.log(min)) : (v - min) / (max - min));
   const fromPos = (p: number) => {
