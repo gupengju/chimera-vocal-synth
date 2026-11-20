@@ -14,6 +14,7 @@ import type { Vec } from "./geom.ts";
 import type { TelemetryMessage } from "../../worklet/protocol.ts";
 import type { VoiceModel } from "../analysis.ts";
 import { V, heat, pressureLevel } from "../colors.ts";
+import { getTheme } from "../theme.ts";
 import { beam, beamPts, chaikin, dot, handle, label, ring, seg, type Pt } from "./vector.ts";
 import { buildProfile, Gaze, jawFn, VIEW, type Profile } from "./profile.ts";
 import { drawReadouts, type Slot } from "./readouts.ts";
@@ -424,7 +425,7 @@ export class AnatomyRenderer {
       p.px = x;
       p.py = y;
     }
-    path.forEach((pa, i) => beam(ctx, pa, "#ffe2a8", 1.1, { alpha: 0.16 + 0.2 * i }));
+    path.forEach((pa, i) => beam(ctx, pa, getTheme() === "light" ? V.amber : "#ffe2a8", 1.1, { alpha: 0.16 + 0.2 * i }));
   }
 
   private drawTurbulence(ctx: CanvasRenderingContext2D, model: VoiceModel, f: HumanFrame, tele: TelemetryMessage): void {
@@ -439,7 +440,7 @@ export class AnatomyRenderer {
     for (let i = 0; i < 30; i++) {
       const pos = this.gridPoint(f, s + 0.2 + rnd() * 1.2, rnd() * 2 - 1);
       if (!pos) continue;
-      dot(ctx, this.X(pos), this.Y(pos), 0.6 + rnd() * 1.4, "#f4fbff", 0.15 + 0.7 * intensity * rnd());
+      dot(ctx, this.X(pos), this.Y(pos), 0.6 + rnd() * 1.4, getTheme() === "light" ? V.white : "#f4fbff", 0.15 + 0.7 * intensity * rnd());
     }
   }
 

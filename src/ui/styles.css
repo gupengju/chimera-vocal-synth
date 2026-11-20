@@ -61,6 +61,87 @@
   color: var(--text);
 }
 
+/* ---------- light theme: the same vector layout on a bright ground.
+   Values mirror the LIGHT palette in colors.ts; only what differs from :root is listed. */
+:root[data-theme="light"] {
+  --blue: #0a6fc2;
+  --blue-mid: #1d5a92;
+  --blue-dim: #9cc7e6;
+  --frame: #9fc3dd;
+  --green: #1f9e4c;
+  --red: #d83a1e;
+  --pink: #d643a8;
+  --white: #1a2a33;
+  --amber: #c97a10;
+  --glow-blue: none;
+  --black: #ffffff;
+  --console: #ffffff;
+  --inset: #eef1f3;
+  --line: var(--frame);
+  --text: var(--blue);
+  --text-dim: var(--blue-mid);
+  --caliper: var(--amber);
+  --caliper-dim: rgba(201, 122, 16, 0.4);
+  color-scheme: light;
+}
+
+:root[data-theme="light"] .text-colors {
+  --text: #0c2a3d;
+  --text-dim: #24475c;
+}
+
+/* containers that hardcode the black console ground */
+:root[data-theme="light"] .boot-error,
+:root[data-theme="light"] .screen,
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .menu,
+:root[data-theme="light"] .menu option,
+:root[data-theme="light"] .sbn input,
+:root[data-theme="light"] .specimen-name {
+  background: #ffffff;
+}
+
+/* the phosphor glow shadows belong to the dark screen; on white they read as smudges */
+:root[data-theme="light"] .wordmark,
+:root[data-theme="light"] .tagline,
+:root[data-theme="light"] .load,
+:root[data-theme="light"] .repo-link,
+:root[data-theme="light"] .volume,
+:root[data-theme="light"] .menu,
+:root[data-theme="light"] .specimen-name {
+  text-shadow: none;
+}
+
+/* the amber action button: dark text on a solid amber ground in light mode */
+:root[data-theme="light"] .act-primary {
+  background: rgba(201, 122, 16, 0.16);
+  color: #6b3a00;
+  text-shadow: none;
+  box-shadow: none;
+}
+:root[data-theme="light"] .act-primary:hover,
+:root[data-theme="light"] .act-primary.on {
+  background: rgba(201, 122, 16, 0.28);
+}
+:root[data-theme="light"] .enc-value {
+  text-shadow: none;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  background: transparent;
+  border: 1px solid var(--frame);
+  color: var(--text);
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  border-color: var(--caliper);
+  color: var(--caliper);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1159,7 +1240,7 @@ button.midi.on .midi-status {
 
 html,
 body {
-  background: #000;
+  background: var(--console);
   color: var(--blue);
   font-size: 13px;
   letter-spacing: 0.06em;
@@ -1394,7 +1475,7 @@ button.ghost:hover,
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #000;
+  background: var(--console);
   border: 1px solid var(--frame);
 }
 
@@ -1755,7 +1836,7 @@ button.midi.on .midi-status {
 
 /* ---------- panels of modes not yet redrawn: framed, black, capital headings */
 .panel {
-  background: #000;
+  background: var(--console);
   border: 1px solid var(--frame);
   border-radius: 0;
 }
@@ -1771,7 +1852,7 @@ button.midi.on .midi-status {
 textarea,
 input[type="text"],
 .sbn input {
-  background: #000;
+  background: var(--console);
   color: var(--blue);
   border: 1px solid var(--frame);
   border-radius: 0;

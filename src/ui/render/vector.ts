@@ -5,7 +5,7 @@
  *
  * Beams are drawn additively ("lighter"), so where lines cross they get brighter, like a beam.
  */
-import { V, core } from "../colors.ts";
+import { V, blendMode, core } from "../colors.ts";
 
 export type Pt = [number, number];
 
@@ -36,7 +36,7 @@ export function pathOf(pts: ArrayLike<Pt>, close = false): Path2D {
 /** stroke a path as a glowing beam */
 export function beam(ctx: CanvasRenderingContext2D, path: Path2D, color: string, width: number, o: BeamOpts = {}): void {
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = blendMode();
   ctx.globalAlpha = o.alpha ?? 1;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
@@ -76,7 +76,7 @@ export function ring(ctx: CanvasRenderingContext2D, x: number, y: number, r: num
 
 export function dot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, alpha = 1): void {
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = blendMode();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -121,7 +121,7 @@ export interface LabelOpts {
 export function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, o: LabelOpts = {}): void {
   const size = o.size ?? 11;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  ctx.globalCompositeOperation = blendMode();
   ctx.globalAlpha = o.alpha ?? 1;
   ctx.font = hfont(size, o.weight);
   if (hasLetterSpacing) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${((o.ls ?? 0.14) * size).toFixed(2)}px`;
@@ -199,7 +199,7 @@ export function ipaGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, ip
   const f = (n: number) => n.toFixed(2);
   const stroke = (d: string) => {
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = blendMode();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = color;
     ctx.lineWidth = sw;
@@ -210,7 +210,7 @@ export function ipaGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, ip
   };
   const glyph = (s: string, tf?: (c: CanvasRenderingContext2D) => void) => {
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+    ctx.globalCompositeOperation = blendMode();
     ctx.globalAlpha = alpha;
     ctx.font = hfont(size);
     ctx.textAlign = "center";
@@ -275,6 +275,8 @@ export class Glow {
   }
 
   apply(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, dpr: number): void {
+    // the halo is an additive-phosphor effect; on a white ground it has nothing to add
+    if (blendMode() !== "lighter") return;
     const W = canvas.width, H = canvas.height;
     const w = Math.max(1, Math.round(W / this.down)), h = Math.max(1, Math.round(H / this.down));
     if (this.small.width !== w || this.small.height !== h) {
