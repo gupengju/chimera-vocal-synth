@@ -6,6 +6,7 @@
  * Beams are drawn additively ("lighter"), so where lines cross they get brighter, like a beam.
  */
 import { V, blendMode, core } from "../colors.ts";
+import { getTheme } from "../theme.ts";
 
 export type Pt = [number, number];
 
@@ -122,7 +123,10 @@ export function label(ctx: CanvasRenderingContext2D, text: string, x: number, y:
   const size = o.size ?? 11;
   ctx.save();
   ctx.globalCompositeOperation = blendMode();
-  ctx.globalAlpha = o.alpha ?? 1;
+  // dark mode fades labels with low alpha for layering; on white the same alpha washes the
+  // dark glyph out, so lift the floor while keeping full-alpha text unchanged
+  const rawAlpha = o.alpha ?? 1;
+  ctx.globalAlpha = getTheme() === "light" ? 0.55 + 0.45 * rawAlpha : rawAlpha;
   ctx.font = hfont(size, o.weight);
   if (hasLetterSpacing) (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${((o.ls ?? 0.14) * size).toFixed(2)}px`;
   ctx.textAlign = o.align ?? "left";

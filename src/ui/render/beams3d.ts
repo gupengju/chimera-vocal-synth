@@ -13,7 +13,8 @@ import * as THREE from "three";
 import { LineSegments2 } from "three/addons/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/addons/lines/LineSegmentsGeometry.js";
 import { LineMaterial } from "three/addons/lines/LineMaterial.js";
-import { core } from "../colors.ts";
+import { core, V } from "../colors.ts";
+import { getTheme } from "../theme.ts";
 
 /** line widths (CSS px) the batches draw at; a beam takes the nearest */
 const WIDTHS = [0.6, 0.85, 1.05, 1.3, 1.6, 2.1];
@@ -107,6 +108,7 @@ class Batch {
 
 const rgbCache = new Map<string, [number, number, number]>();
 function rgb(hex: string): [number, number, number] {
+  if (typeof hex !== "string") hex = V.blue; // guard against a missing style entry
   let c = rgbCache.get(hex);
   if (!c) {
     const v = parseInt(hex.slice(1), 16);
@@ -142,6 +144,29 @@ export class Beams {
   /** the canvas size in CSS px (the fat lines' widths are in CSS px) */
   setResolution(w: number, h: number): void {
     for (const b of this.batches) b.material.resolution.set(w, h);
+  }
+
+  /**
+   * Max blending only works on a black ground (the brighter of line/ground wins). On white every
+   * line would max against the white and vanish, so the light theme uses normal overpaint.
+   * Called each frame; the assignments are cheap and no-ops while the theme is unchanged.
+   */
+  private lightGround = false;
+  applyTheme(): void {
+    const light = getTheme() === "light";
+    if (light === this.lightGround) return;
+    this.lightGround = light;
+    for (const b of this.batches) {
+      const m = b.material;
+      if (light) {
+        m.blending = THREE.NormalBlending;
+        m.blendEquation = THREE.AddEquation;
+      } else {
+        m.blending = THREE.CustomBlending;
+        m.blendEquation = THREE.MaxEquation;
+      }
+      m.needsUpdate = true;
+    }
   }
 
   begin(): void {

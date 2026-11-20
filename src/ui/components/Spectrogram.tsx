@@ -2,7 +2,7 @@ import { useRef } from "react";
 import { usePhosphor } from "../usePhosphor.ts";
 import { engine } from "../../audio/AudioEngine.ts";
 import { useStore } from "../store.ts";
-import { TEXT, V, mix } from "../colors.ts";
+import { TEXT, V, C, mix } from "../colors.ts";
 import { beam, label, seg } from "../render/vector.ts";
 
 const FMIN = 60, FMAX = 12000;
@@ -67,7 +67,7 @@ export function Spectrogram() {
       fill.closePath();
       ctx.save();
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = C.console;
       ctx.fill(fill);
       ctx.restore();
       const fade = 1 - age / SLICES;
