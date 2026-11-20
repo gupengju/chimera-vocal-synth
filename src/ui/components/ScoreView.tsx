@@ -3,7 +3,7 @@ import { usePhosphor } from "../usePhosphor.ts";
 import { engine } from "../../audio/AudioEngine.ts";
 import { currentPlan, onPlan, type SpokenPlan } from "../speech.ts";
 import { activation, type Gesture } from "../../wasm/engine.ts";
-import { TEXT, V } from "../colors.ts";
+import { TEXT, V, C } from "../colors.ts";
 import { beam, beamPts, blockLineH, label, labelBlock, seg, wrapLabel, type Pt } from "../render/vector.ts";
 
 /** rows of the score, coloured like the articulators on the face (lips pink, tongue green, soft palate white, glottis amber) */
@@ -47,7 +47,7 @@ export function ScoreView() {
       const msg = "SPEAK SOMETHING TO SEE ITS GESTURES: WHICH ARTICULATOR MOVES, WHEN, AND HOW THEY OVERLAP.";
       const cy = (top + bottom) / 2;
       const bh = wrapLabel(ctx, msg, right - left - 16, { size: 10, ls: 0.12 }).length * blockLineH(10) + 8;
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = C.console;
       ctx.fillRect(left, cy - bh / 2, right - left, bh);
       labelBlock(ctx, msg, left + 8, cy, right - left - 16, { size: 10, color: TEXT.secondary, ls: 0.12 });
       return;

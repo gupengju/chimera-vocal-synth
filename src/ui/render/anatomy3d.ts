@@ -779,6 +779,7 @@ export class Anatomy3D {
     fog.near = dist - 3 * k;
     fog.far = dist + 30 * k;
 
+    B.applyTheme();
     B.begin();
     const flat = (pts: Vec[], z = 0): Float32Array => {
       const o = new Float32Array(pts.length * 3);
