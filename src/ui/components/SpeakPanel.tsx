@@ -12,7 +12,18 @@ import type { InfoFn, SlotsFn } from "./AnatomyView.tsx";
 import { V } from "../colors.ts";
 import { engine } from "../../audio/AudioEngine.ts";
 
-const EXAMPLES = ["Hello. Can you hear me?", "She sells sea shells by the sea shore.", "Every sound here is air moving through a throat.", "The quick brown fox jumps over the lazy dog.", "你好！今天天气很好。"];
+const EXAMPLES = [
+  "Hello. Can you hear me?",
+  "She sells sea shells by the sea shore.",
+  "Every sound here is air moving through a throat.",
+  "The quick brown fox jumps over the lazy dog.",
+  "你好！今天天气很好。",
+  "请问，火车站怎么走？",
+  "我喜欢唱歌，也喜欢吃火锅。",
+  "贵阳的夏天非常凉爽。",
+  "好好学习，天天向上。",
+  "这个声音是用空气模拟出来的。",
+];
 
 // IPA pulmonic consonant chart (rows = manner, columns = place); empty cells are null
 const PLACES = ["Bilabial", "Labiodental", "Dental", "Alveolar", "Postalveolar", "Retroflex", "Palatal", "Velar", "Uvular", "Pharyngeal", "Glottal"];
@@ -174,18 +185,28 @@ export function SpeakRight() {
             </div>
           </div>
           <div className="examples" role="group" aria-label="Examples">
-            {EXAMPLES.map((ex) => (
-              <Chip
-                key={ex}
-                toggle={false}
-                onClick={() => {
+            <label className="example-pick">
+              <span className="example-pick-label">Examples</span>
+              <select
+                aria-label="Pick an example"
+                value=""
+                onChange={(e) => {
+                  const ex = e.target.value;
+                  if (!ex) return;
                   setText(ex);
                   setIpa(false);
                 }}
               >
-                {ex}
-              </Chip>
-            ))}
+                <option value="" disabled>
+                  Choose an example…
+                </option>
+                {EXAMPLES.map((ex) => (
+                  <option key={ex} value={ex}>
+                    {ex}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
       </Screen>

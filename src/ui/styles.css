@@ -2129,6 +2129,42 @@ input[type="range"]::-moz-range-thumb {
   padding: 2px 7px;
 }
 
+/* example dropdown: a native select that follows the theme via variables */
+.example-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.example-pick-label {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.example-pick select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  padding: 7px 10px;
+  background: var(--console);
+  border: 1px solid var(--blue-dim);
+  border-radius: 0;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 12px;
+  cursor: pointer;
+}
+.example-pick select:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+.example-pick option {
+  background: var(--console);
+  color: var(--text);
+}
+
 .vowel-pick {
   display: flex;
   gap: 4px;
