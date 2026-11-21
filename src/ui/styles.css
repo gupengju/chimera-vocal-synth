@@ -90,6 +90,17 @@
   --text-dim: #24475c;
 }
 
+/* the start-prompt overlay hardcodes a dark translucent ground; on white use a bright panel
+   with dark text so the welcome dialog stays readable */
+:root[data-theme="light"] .start-prompt {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: none;
+}
+:root[data-theme="light"] .start-prompt p,
+:root[data-theme="light"] .start-prompt .hint {
+  color: #24475c;
+}
+
 /* containers that hardcode the black console ground */
 :root[data-theme="light"] .boot-error,
 :root[data-theme="light"] .screen,
