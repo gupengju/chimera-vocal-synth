@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../store.ts";
-import { speakText, speakPhrases, stopSpeaking, onPlan, currentPlan, spokenWordNow } from "../speech.ts";
+import { speakText, speakPhrases, stopSpeaking, onPlan, currentPlan, spokenWordNow, type SpeakLang } from "../speech.ts";
 import { mouthWords } from "../mouthWords.ts";
 import { tokenizeIpa } from "../../wasm/engine.ts";
 import { Slider, Toggle } from "./Controls.tsx";
@@ -12,18 +12,35 @@ import type { InfoFn, SlotsFn } from "./AnatomyView.tsx";
 import { V } from "../colors.ts";
 import { engine } from "../../audio/AudioEngine.ts";
 
-const EXAMPLES = [
-  "Hello. Can you hear me?",
-  "She sells sea shells by the sea shore.",
-  "Every sound here is air moving through a throat.",
-  "The quick brown fox jumps over the lazy dog.",
-  "你好！今天天气很好。",
-  "请问，火车站怎么走？",
-  "我喜欢唱歌，也喜欢吃火锅。",
-  "贵阳的夏天非常凉爽。",
-  "好好学习，天天向上。",
-  "这个声音是用空气模拟出来的。",
+/** The three front ends, picked explicitly — the text is never guessed at. */
+const LANGS: { id: SpeakLang; label: string; hint: string }[] = [
+  { id: "english", label: "English", hint: "Type something for the voice to say" },
+  { id: "mandarin", label: "普通话", hint: "输入汉字或拼音，例如 你好。 / ni3 hao3" },
+  { id: "guiyang", label: "贵阳话", hint: "输入汉字或记法，例如 国角。 / gue2 jio2" },
 ];
+
+const EXAMPLES: Record<SpeakLang, string[]> = {
+  english: [
+    "Hello. Can you hear me?",
+    "She sells sea shells by the sea shore.",
+    "Every sound here is air moving through a throat.",
+    "The quick brown fox jumps over the lazy dog.",
+  ],
+  mandarin: [
+    "你好！今天天气很好。",
+    "请问，火车站怎么走？",
+    "我喜欢唱歌，也喜欢吃火锅。",
+    "好好学习，天天向上。",
+    "这个声音是用空气模拟出来的。",
+  ],
+  guiyang: [
+    "国角。",
+    "夏天。",
+    "天气好。",
+    "gue2 jio2 qiw2。",
+    "li3 hao3。",
+  ],
+};
 
 // IPA pulmonic consonant chart (rows = manner, columns = place); empty cells are null
 const PLACES = ["Bilabial", "Labiodental", "Dental", "Alveolar", "Postalveolar", "Retroflex", "Palatal", "Velar", "Uvular", "Pharyngeal", "Glottal"];
@@ -128,7 +145,8 @@ export function SpeakRight() {
   const body = useStore((s) => s.body);
   const f0 = useStore((s) => s.source.f0);
   const start = useStore((s) => s.start);
-  const [text, setText] = useState(EXAMPLES[0]);
+  const [lang, setLang] = useState<SpeakLang>("english");
+  const [text, setText] = useState(EXAMPLES.english[0]);
   const [ipa, setIpa] = useState(false);
   const [rate, setRate] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -140,10 +158,15 @@ export function SpeakRight() {
     setBusy(true);
     try {
       await start();
-      await speakText(text, { ipa, body, rate, f0 });
+      await speakText(text, { ipa, lang, body, rate, f0 });
     } finally {
       setBusy(false);
     }
+  };
+  /** Switching language swaps only an untouched example; typed text is left alone. */
+  const pickLang = (id: SpeakLang) => {
+    setLang(id);
+    if (EXAMPLES[lang].includes(text) || text === "") setText(EXAMPLES[id][0]);
   };
   const pad = async (c: string) => {
     await start();
@@ -152,7 +175,23 @@ export function SpeakRight() {
 
   return (
     <div className="right right-speak">
-      <Screen className="s-say" title="Say" sub="Text to speech" tools={<Toggle label="Text is IPA" checked={ipa} onChange={setIpa} />}>
+      <Screen
+        className="s-say"
+        title="Say"
+        sub="Text to speech"
+        tools={
+          <>
+            <div className="lang-pick" role="group" aria-label="Language">
+              {LANGS.map((l) => (
+                <Chip key={l.id} on={!ipa && lang === l.id} onClick={() => pickLang(l.id)} disabled={ipa}>
+                  {l.label}
+                </Chip>
+              ))}
+            </div>
+            <Toggle label="Text is IPA" checked={ipa} onChange={setIpa} />
+          </>
+        }
+      >
         <div className="say">
           <div className="say-row">
             <textarea
@@ -165,7 +204,7 @@ export function SpeakRight() {
               rows={2}
               spellCheck={!ipa}
               aria-label={ipa ? "IPA to speak" : "Text to speak"}
-              placeholder={ipa ? "Type IPA, for example ˈhɛloʊ" : "Type something for the voice to say"}
+              placeholder={ipa ? "Type IPA, for example ˈhɛloʊ" : (LANGS.find((l) => l.id === lang)?.hint ?? "")}
             />
             <div className="say-actions">
               <button className="primary" onClick={() => void speak()} disabled={busy}>
@@ -200,7 +239,7 @@ export function SpeakRight() {
                 <option value="" disabled>
                   Choose an example…
                 </option>
-                {EXAMPLES.map((ex) => (
+                {EXAMPLES[lang].map((ex) => (
                   <option key={ex} value={ex}>
                     {ex}
                   </option>

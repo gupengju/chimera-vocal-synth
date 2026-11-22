@@ -106,6 +106,39 @@ export function isMandarin(text: string): boolean {
 }
 
 /**
+ * Guiyang (贵阳话) text → phonemes: the book's notation (tone digits, `gue2 jio2`), or characters
+ * once the dictionary (`/data/guiyang.txt.gz`) loads. Its tones are 55 / 21 / 42 / 13, so the
+ * plan needs `toneScheme: "guiyang"` (see `PlanOptions`).
+ */
+export class GuiyangG2P {
+  private loading: Promise<void> | null = null;
+
+  load(url = "/data/guiyang.txt.gz"): Promise<void> {
+    this.loading ??= fetchDictionary(url).then(
+      (text) => this.setDictionaryText(text),
+      (e) => {
+        this.loading = null; // allow a retry
+        throw e;
+      },
+    );
+    return this.loading;
+  }
+
+  setDictionaryText(text: string): void {
+    call("guiyangLoad", { text });
+  }
+
+  toPhrases(text: string): Phrase[] {
+    return call("guiyangPhrases", { text });
+  }
+}
+
+/** Han characters, tone marks, or syllables the dialect can parse ("gue2 jio2"). */
+export function isGuiyang(text: string): boolean {
+  return call("isGuiyang", { text });
+}
+
+/**
  * English text → phonemes: CMUdict once loaded (fetched and gunzipped here, parsed by the
  * engine), letter-to-sound rules until then. One dictionary per page (the engine keeps it).
  */
@@ -170,6 +203,9 @@ export interface PlanOptions {
   /** a sung phrase (planSong sets it): consonants given a pitch hold it, and pitch ramps shrink
    *  to fit short notes */
   sung?: boolean;
+  /** the tone system the tones were written in: Mandarin 55/35/214/51 (default) or
+   *  Guiyang 55/21/42/13 */
+  toneScheme?: "mandarin" | "guiyang";
 }
 
 export function planUtterance(segments: Segment[], options: PlanOptions): Plan {

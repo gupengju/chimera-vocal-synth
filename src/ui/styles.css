@@ -1590,7 +1590,21 @@ button.ghost:hover,
   margin-left: auto;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
+}
+
+/* language picker next to "Text is IPA": one chip per front end */
+.lang-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: 6px;
+}
+
+.lang-pick .chip:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .screen-body {

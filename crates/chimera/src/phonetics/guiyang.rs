@@ -321,7 +321,7 @@ impl GuiyangG2P {
             };
             let readings: Vec<&str> = p.split(' ').collect();
             if readings.len() == n {
-                let syls = readings.iter().zip(&run[i..i + n]).filter_map(|(r, &h)| syllable(r).map(|(segs, tone)| Syl { segs, tone })).collect();
+                let syls = readings.iter().zip(&run[i..i + n]).filter_map(|(r, _)| syllable(r).map(|(segs, tone)| Syl { segs, tone })).collect();
                 words.push((w, syls));
             }
             i += n;

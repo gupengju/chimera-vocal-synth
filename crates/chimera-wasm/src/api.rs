@@ -12,6 +12,7 @@ use chimera::phonetics::beatbox::{self, BeatStep};
 use chimera::phonetics::planner::{self, PhraseInput, PlanOptions};
 use chimera::phonetics::sing::{self, MelismaOptions, NoteOnOptions, SongOptions, SungNote};
 use chimera::phonetics::english::EnglishG2P;
+use chimera::phonetics::guiyang::GuiyangG2P;
 use chimera::phonetics::mandarin::MandarinG2P;
 use chimera::phonetics::{Segment, Syllable, ipa, songs, syllables, vowel_data};
 use chimera::voice::human_airway::HumanAirway;
@@ -36,6 +37,8 @@ struct State {
     g2p: EnglishG2P,
     /// the page's Mandarin G2P (pinyin works before its dictionary loads; characters need it)
     zh: MandarinG2P,
+    /// the page's Guiyang G2P (the dialect's notation works before its dictionary loads)
+    gui: GuiyangG2P,
 }
 
 thread_local! {
@@ -133,6 +136,12 @@ fn dispatch(st: &mut State, req: &Value) -> Res {
         }
         "zhPhrases" => to_json(&st.zh.to_phrases(&arg::<String>(req, "text")?)),
         "isMandarin" => Ok(json!(chimera::phonetics::mandarin::is_mandarin(&arg::<String>(req, "text")?))),
+        "guiyangLoad" => {
+            st.gui.load_dict(&arg::<String>(req, "text")?);
+            Ok(json!(true))
+        }
+        "guiyangPhrases" => to_json(&st.gui.to_phrases(&arg::<String>(req, "text")?)),
+        "isGuiyang" => Ok(json!(chimera::phonetics::guiyang::is_guiyang(&arg::<String>(req, "text")?))),
         "lyricsToSyllables" => {
             let text: String = arg(req, "text")?;
             if chimera::phonetics::mandarin::is_mandarin(&text) {

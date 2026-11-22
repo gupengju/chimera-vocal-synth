@@ -1,6 +1,6 @@
 /** Main-thread speech planning: text/IPA → phrases → gestural plan → worklet. */
 import type { BodyMix } from "../wasm/types.ts";
-import { EnglishG2P, MandarinG2P, isMandarin, type Phrase } from "../wasm/engine.ts";
+import { EnglishG2P, GuiyangG2P, MandarinG2P, type Phrase } from "../wasm/engine.ts";
 import { tokenizeIpa } from "../wasm/engine.ts";
 import { planPhrases, type Plan, type Segment } from "../wasm/engine.ts";
 import { engine } from "../audio/AudioEngine.ts";
@@ -9,6 +9,10 @@ import { transcribe, wordSpans, type WordSpan } from "./words.ts";
 
 export const g2p = new EnglishG2P();
 export const zh = new MandarinG2P();
+export const gy = new GuiyangG2P();
+
+/** The three front ends the page can pick from (explicitly — no guessing from the text). */
+export type SpeakLang = "english" | "mandarin" | "guiyang";
 
 
 export interface SpokenPlan {
@@ -49,19 +53,28 @@ export function ipaToPhrases(text: string): Phrase[] {
     .map((p) => ({ segments: tokenizeIpa(p), intonation: "statement" as const, pause: 0.3, words: [] }));
 }
 
-export function speakPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat"; pause?: number; words?: string[] }[], o: { body: BodyMix; rate: number; f0: number }): SpokenPlan {
-  const plan = planPhrases(phrases, { body: o.body, t0: 0, rate: o.rate, f0: o.f0 });
+export function speakPhrases(phrases: { segments: Segment[]; intonation?: "statement" | "question" | "flat"; pause?: number; words?: string[] }[], o: { body: BodyMix; rate: number; f0: number; toneScheme?: "mandarin" | "guiyang" }): SpokenPlan {
+  const plan = planPhrases(phrases, { body: o.body, t0: 0, rate: o.rate, f0: o.f0, toneScheme: o.toneScheme });
   const id = engine.schedule({ gestures: plan.gestures.map((g: Gesture) => ({ ...g, targets: { ...g.targets } })), segments: plan.segments, end: plan.end });
-  current = { plan, offset: null, id, transcription: transcribe(phrases), words: wordSpans(phrases, plan) };
+  current = { plan, offset: null, id, transcription: transcribe(phrases, o.toneScheme), words: wordSpans(phrases, plan) };
   for (const l of listeners) l(current);
   return current;
 }
 
-export async function speakText(text: string, o: { ipa: boolean; body: BodyMix; rate: number; f0: number }): Promise<SpokenPlan | null> {
+export async function speakText(text: string, o: { ipa: boolean; lang: SpeakLang; body: BodyMix; rate: number; f0: number }): Promise<SpokenPlan | null> {
   if (!text.trim()) return null;
   let phrases: Phrase[];
+  let toneScheme: "mandarin" | "guiyang" | undefined;
   if (o.ipa) phrases = ipaToPhrases(text);
-  else if (isMandarin(text)) {
+  else if (o.lang === "guiyang") {
+    try {
+      await gy.load();
+    } catch {
+      // dictionary unavailable: the notation still works
+    }
+    phrases = gy.toPhrases(text);
+    toneScheme = "guiyang";
+  } else if (o.lang === "mandarin") {
     try {
       await zh.load();
     } catch {
@@ -77,7 +90,7 @@ export async function speakText(text: string, o: { ipa: boolean; body: BodyMix; 
     phrases = g2p.toPhrases(text);
   }
   if (!phrases.length) return null;
-  return speakPhrases(phrases, o);
+  return speakPhrases(phrases, { ...o, toneScheme });
 }
 
 export function stopSpeaking(): void {

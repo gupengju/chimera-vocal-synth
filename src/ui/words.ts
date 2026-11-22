@@ -37,16 +37,19 @@ export function wordSpans(phrases: { segments: Segment[]; words?: string[] }[], 
   return out;
 }
 
-/** Chao tone letters (shown in the transcription) */
-const TONE_LETTERS = ["", "˥", "˧˥", "˨˩˦", "˥˩", ""];
+/** Chao tone letters (shown in the transcription): Mandarin 55/35/214/51, Guiyang 55/21/42/13 */
+const TONE_LETTERS: Record<"mandarin" | "guiyang", string[]> = {
+  mandarin: ["", "˥", "˧˥", "˨˩˦", "˥˩", ""],
+  guiyang: ["", "˥", "˨˩", "˦˨", "˩˧", ""],
+};
 
 /** Phrases as shown under the text box: IPA with stress marks, aspiration and tone letters. */
-export function transcribe(phrases: { segments: Segment[]; intonation?: string }[]): string {
+export function transcribe(phrases: { segments: Segment[]; intonation?: string }[], scheme: "mandarin" | "guiyang" = "mandarin"): string {
   // a tone letter ends its syllable: after the nucleus, or after a nasal coda (a nasal right after
   // a toned nucleus)
   const tone = (segs: Segment[], i: number) => {
     const t = segs[i].tone ?? (/^[nŋ]$/.test(segs[i].ipa) ? segs[i - 1]?.tone : undefined);
-    return t && !(segs[i].tone && /^[nŋ]$/.test(segs[i + 1]?.ipa ?? "")) ? TONE_LETTERS[t] : "";
+    return t && !(segs[i].tone && /^[nŋ]$/.test(segs[i + 1]?.ipa ?? "")) ? TONE_LETTERS[scheme][t] : "";
   };
   return phrases.map((p) => p.segments.map((s, i) => (s.tone ? "" : s.stress === 1 ? "ˈ" : s.stress === 2 ? "ˌ" : "") + s.ipa + (s.aspirated ? "ʰ" : "") + tone(p.segments, i) + (s.wordEnd ? " " : "")).join("").trim() + (p.intonation === "question" ? "?" : "")).join(" | ");
 }
