@@ -103,6 +103,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
                 "speech" => render::speech(&ctx, rest),
                 "text" => render::text(&ctx, rest),
                 "mandarin" => render::mandarin(&ctx, rest),
+                "guiyang" => render::guiyang(&ctx, rest),
+                "say" => render::say_lang(&ctx, rest),
                 "song" => render::song(&ctx, rest),
                 "notes" => render::notes(&ctx, rest),
                 "beatbox" => render::beatbox(&ctx, rest),

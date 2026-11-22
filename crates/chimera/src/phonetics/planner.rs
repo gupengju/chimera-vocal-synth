@@ -40,18 +40,40 @@ pub fn vowel_table() -> &'static VowelTable {
     T.get_or_init(|| serde_json::from_str(include_str!("vowelTargets.generated.json")).expect("vowelTargets.generated.json"))
 }
 
-/// Diphthongs and r-coloured vowels expand to vowel sequences. American /eɪ oʊ/ glide toward
-/// [i u] (Hillenbrand et al. 1995: /e/ F2 rises ~150 Hz, /o/ F1 falls with F2 steady); with
-/// [ɪ ʊ] as targets they barely moved (/e/ and /ɪ/ share F2) and sounded like the steady
-/// [eː oː] of Indian English. The other offglides undershoot toward [ɪ ʊ].
-pub fn expand(ipa: &str) -> Option<&'static [&'static str]> {
+/// Diphthongs and r-coloured vowels expand to vowel sequences, each with the share of the
+/// syllable nucleus it gets. American /eɪ oʊ/ glide toward [i u] (Hillenbrand et al. 1995: /e/ F2
+/// rises ~150 Hz, /o/ F1 falls with F2 steady); with [ɪ ʊ] as targets they barely moved (/e/ and
+/// /ɪ/ share F2) and sounded like the steady [eː oː] of Indian English.
+/// The Guiyang entries are the dialect's rhymes: one segment per vowel run, split with equal
+/// weights (the notation and its values are in `docs/DIALECT_NOTATION.md` of the C++ port).
+pub fn expand(ipa: &str) -> Option<&'static [(&'static str, f64)]> {
     Some(match ipa {
-        "aɪ" => &["a", "ɪ"],
-        "aʊ" => &["a", "ʊ"],
-        "ɔɪ" => &["ɔ", "ɪ"],
-        "eɪ" => &["e", "i"],
-        "oʊ" => &["o", "u"],
-        "ɚ" => &["ɝ"],
+        "aɪ" => &[("a", 0.55), ("ɪ", 0.45)],
+        "aʊ" => &[("a", 0.55), ("ʊ", 0.45)],
+        "ɔɪ" => &[("ɔ", 0.55), ("ɪ", 0.45)],
+        "eɪ" => &[("e", 0.55), ("i", 0.45)],
+        "oʊ" => &[("o", 0.55), ("u", 0.45)],
+        "ɚ" => &[("ɝ", 1.0)],
+        // Guiyang: equal-weight vowels (two targets 0.5/0.5, three 1/3 each)
+        "ai" => &[("a", 0.5), ("i", 0.5)],
+        "ei" => &[("e", 0.5), ("i", 0.5)],
+        "ɑu" => &[("ɑ", 0.5), ("u", 0.5)],
+        "əu" => &[("ə", 0.5), ("u", 0.5)],
+        "ia" => &[("i", 0.5), ("a", 0.5)],
+        "iɛ" => &[("i", 0.5), ("ɛ", 0.5)],
+        "io" => &[("i", 0.5), ("o", 0.5)],
+        "iu" => &[("i", 0.5), ("u", 0.5)],
+        "ua" => &[("u", 0.5), ("a", 0.5)],
+        "uɛ" => &[("u", 0.5), ("ɛ", 0.5)],
+        "yɛ" => &[("y", 0.5), ("ɛ", 0.5)],
+        "iɑ" => &[("i", 0.5), ("ɑ", 0.5)],
+        "uɑ" => &[("u", 0.5), ("ɑ", 0.5)],
+        "uə" => &[("u", 0.5), ("ə", 0.5)],
+        "ya" => &[("y", 0.5), ("a", 0.5)],
+        "iɑu" => &[("i", 1.0 / 3.0), ("ɑ", 1.0 / 3.0), ("u", 1.0 / 3.0)],
+        "iəu" => &[("i", 1.0 / 3.0), ("ə", 1.0 / 3.0), ("u", 1.0 / 3.0)],
+        "uai" => &[("u", 1.0 / 3.0), ("a", 1.0 / 3.0), ("i", 1.0 / 3.0)],
+        "uei" => &[("u", 1.0 / 3.0), ("e", 1.0 / 3.0), ("i", 1.0 / 3.0)],
         _ => return None,
     })
 }
@@ -59,7 +81,7 @@ pub fn expand(ipa: &str) -> Option<&'static [&'static str]> {
 /// The two vowel targets of a diphthong ("aɪ" → ("a", "ɪ")), or None.
 pub fn diphthong_parts(ipa: &str) -> Option<(&'static str, &'static str)> {
     match expand(ipa) {
-        Some(p) if p.len() == 2 => Some((p[0], p[1])),
+        Some(p) if p.len() == 2 => Some((p[0].0, p[1].0)),
         _ => None,
     }
 }
@@ -138,6 +160,20 @@ pub struct PlanOptions {
     /// fit short notes. Speech and live notes leave it unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sung: Option<bool>,
+    /// lexical tone contours: Mandarin 55/35/214/51 (the default) or Guiyang 55/21/42/13
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tone_scheme: Option<ToneScheme>,
+}
+
+/// How a phrase turns lexical tones into pitch targets.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ToneScheme {
+    /// 阴平 55, 阳平 35, 上声 21(4), 去声 51
+    #[default]
+    Mandarin,
+    /// 阴平 55, 阳平 21, 上声 42, 去声 13 (贵阳新派)
+    Guiyang,
 }
 
 /// JS truthiness of an optional number (`if (s.f0)`: 0 and NaN are false).
@@ -196,9 +232,8 @@ pub fn plan_utterance(input: &[Segment], o: &PlanOptions) -> Plan {
     for (si, s) in input.iter().enumerate() {
         if let Some(parts) = expand(&s.ipa) {
             let base = durs[si];
-            for (i, p) in parts.iter().enumerate() {
-                let dur = if parts.len() > 1 { base * (if i == 0 { 0.55 } else { 0.45 }) } else { base };
-                segs.push(Seg { ipa: p, dur: Some(dur), stress: s.stress, f0: s.f0, aspirated: s.aspirated, tone: s.tone, def: None, vowel: None, glide_from: i > 0 });
+            for (i, (p, w)) in parts.iter().enumerate() {
+                segs.push(Seg { ipa: p, dur: Some(base * w), stress: s.stress, f0: s.f0, aspirated: s.aspirated, tone: s.tone, def: None, vowel: None, glide_from: i > 0 });
             }
         } else {
             segs.push(Seg { ipa: &s.ipa, dur: Some(durs[si]), stress: s.stress, f0: s.f0, aspirated: s.aspirated, tone: s.tone, def: None, vowel: None, glide_from: false });
@@ -388,7 +423,7 @@ pub fn plan_utterance(input: &[Segment], o: &PlanOptions) -> Plan {
             if next.is_none() && o.intonation == Some(Intonation::Question) {
                 st += 3.0;
             }
-            let levels = tone_contour(tone, prev.and_then(|k| segs[k].tone), next.is_none());
+            let levels = tone_contour(o.tone_scheme.unwrap_or_default(), tone, prev.and_then(|k| segs[k].tone), next.is_none());
             tone_gestures(levels, t0, rhyme_end, ramp_in, ramp_out, f0 * crate::math::pow(2.0, st / 12.0), &mut gestures);
             continue;
         }
@@ -479,22 +514,37 @@ fn closes_in_front(front: &str, back: &str) -> bool {
 /// speaker's tonal range is about an octave, so 1–5 spans 10 semitones.
 const CHAO_STEP: f64 = 2.5;
 
-/// A Mandarin tone's pitch targets (Chao levels, spread evenly over the rhyme). Tone 3 is low
-/// (21) except phrase-finally (214); the neutral tone (5) is a short level set by the tone before.
-fn tone_contour(tone: u8, prev: Option<u8>, last: bool) -> &'static [f64] {
-    match tone {
-        1 => &[5.0, 5.0],
-        2 => &[3.0, 5.0],
-        3 if last => &[2.0, 1.0, 4.0],
-        3 => &[2.0, 1.0],
-        4 => &[5.0, 1.0],
-        _ => match prev {
-            Some(1) => &[2.0],
-            Some(2) => &[3.0],
-            Some(3) => &[4.0],
-            Some(4) => &[1.0],
-            _ => &[3.0],
+/// A tone's pitch targets (Chao levels, spread evenly over the rhyme). Mandarin: tone 3 is low
+/// (21) except phrase-finally (214). Guiyang: 55 / 21 / 42 / 13, level or falling on the nucleus.
+/// The neutral tone (5) is a short level set by the tone before, in both.
+fn tone_contour(scheme: ToneScheme, tone: u8, prev: Option<u8>, last: bool) -> &'static [f64] {
+    match scheme {
+        ToneScheme::Mandarin => match tone {
+            1 => &[5.0, 5.0],
+            2 => &[3.0, 5.0],
+            3 if last => &[2.0, 1.0, 4.0],
+            3 => &[2.0, 1.0],
+            4 => &[5.0, 1.0],
+            _ => neutral_contour(prev),
         },
+        ToneScheme::Guiyang => match tone {
+            1 => &[5.0, 5.0],
+            2 => &[2.0, 1.0],
+            3 => &[4.0, 2.0],
+            4 => &[1.0, 3.0],
+            _ => neutral_contour(prev),
+        },
+    }
+}
+
+/// The neutral tone (5) is short and level, at the tail of the tone before it.
+fn neutral_contour(prev: Option<u8>) -> &'static [f64] {
+    match prev {
+        Some(1) => &[2.0],
+        Some(2) => &[3.0],
+        Some(3) => &[4.0],
+        Some(4) => &[1.0],
+        _ => &[3.0],
     }
 }
 

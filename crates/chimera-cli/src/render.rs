@@ -13,9 +13,11 @@ use chimera::creatures::{CREATURES, creature_by_id};
 use chimera::math::{js_max, js_min, js_round, log10};
 use chimera::phonetics::beatbox::{BEAT_PRESETS, BEAT_SOUNDS, BeatStep, beat_ready, parse_beat};
 use chimera::phonetics::english::EnglishG2P;
+use chimera::phonetics::guiyang::GuiyangG2P;
 use chimera::phonetics::mandarin::MandarinG2P;
 use chimera::phonetics::ipa::tokenize_ipa;
 use chimera::phonetics::planner::{
+    ToneScheme,
     PhraseInput, PlanOptions, plan_phrases, plan_utterance, vowel_table,
 };
 use chimera::phonetics::sing::{
@@ -58,6 +60,13 @@ pub fn g2p() -> Result<EnglishG2P, String> {
 pub fn mandarin_g2p() -> Result<MandarinG2P, String> {
     let mut g = MandarinG2P::new();
     g.load_dict(&gunzip("public/data/mandarin.txt.gz")?);
+    Ok(g)
+}
+
+/// The Guiyang dictionary (`public/data/guiyang.txt.gz`) loaded into a G2P.
+pub fn guiyang_g2p() -> Result<GuiyangG2P, String> {
+    let mut g = GuiyangG2P::new();
+    g.load_dict(&gunzip("public/data/guiyang.txt.gz")?);
     Ok(g)
 }
 
@@ -161,6 +170,11 @@ pub fn say(g: &EnglishG2P, text: &str, body_name: &str) -> Result<Spoken, String
 
 /// [`say`] for phrases from any front end.
 pub fn say_phrases(phrases: &[chimera::phonetics::english::Phrase], body_name: &str) -> Result<Spoken, String> {
+    say_phrases_with(phrases, body_name, None)
+}
+
+/// The same, with an explicit tone scheme (Mandarin contours by default, Guiyang for 贵阳话).
+pub fn say_phrases_with(phrases: &[chimera::phonetics::english::Phrase], body_name: &str, tone: Option<ToneScheme>) -> Result<Spoken, String> {
     let b = body(body_name)?;
     let f0 = text_f0(body_name);
     let shown: Vec<String> = phrases
@@ -202,6 +216,7 @@ pub fn say_phrases(phrases: &[chimera::phonetics::english::Phrase], body_name: &
             body: body_name.into(),
             t0: 0.05,
             f0: Some(f0),
+            tone_scheme: tone,
             ..Default::default()
         },
     );
@@ -242,6 +257,30 @@ pub fn mandarin(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     ctx.write_wav(&file, &s.out)?;
     println!("wrote {file}  {} s", fixed(s.out.len() as f64 / FS, 2));
     Ok(())
+}
+
+/// Guiyang (贵阳话: characters or the book's pinyin notation) through the phrase planner.
+/// `render guiyang <out> ["国 gue2 角 jio2。"] [body]`
+pub fn guiyang(ctx: &Ctx, a: &[String]) -> Result<(), String> {
+    let name = arg(a, 0, "out/guiyang");
+    let text = arg(a, 1, "国 gue2 角 jio2。");
+    let s = say_phrases_with(&guiyang_g2p()?.to_phrases(text), arg(a, 2, "male"), Some(ToneScheme::Guiyang))?;
+    println!("{}", s.shown);
+    let file = wav_name(name);
+    ctx.write_wav(&file, &s.out)?;
+    println!("wrote {file}  {} s", fixed(s.out.len() as f64 / FS, 2));
+    Ok(())
+}
+
+/// One entry point with the language named first — the explicit choice between the three
+/// frontends. `render say <mandarin|english|guiyang> <out> ["text"] [body]`
+pub fn say_lang(ctx: &Ctx, a: &[String]) -> Result<(), String> {
+    match arg(a, 0, "mandarin") {
+        "mandarin" => mandarin(ctx, &a[1.min(a.len())..]),
+        "guiyang" => guiyang(ctx, &a[1.min(a.len())..]),
+        "english" => text(ctx, &a[1.min(a.len())..]),
+        l => Err(format!("unknown language {l:?}; have mandarin, guiyang, english")),
+    }
 }
 
 /// The demo songs, and a live-style key sequence. `render song [outdir] [body]`
