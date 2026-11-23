@@ -39,6 +39,23 @@ describe("guiyang", () => {
     expect(gy.toPhrases("国角？")[0].intonation).toBe("question");
   });
 
+  test("ŋ onset is a consonant segment and the vowel stays oral", () => {
+    // ŋ 是独立辅音音段（与 m/n/p/t 同级）；后面的元音是口元音，不因 ŋ 声母而鼻化。
+    const ipa = (t: string) => gy.toPhrases(t)[0].segments.map((s) => s.ipa);
+    expect(ipa("ngo3")).toEqual(["ŋ", "o"]); // 我，不是 ŋõ
+    expect(ipa("ngan1")).toEqual(["ŋ", "a", "n"]); // 安：鼻音色彩来自 n 韵尾
+    expect(ipa("我")).toEqual(["ŋ", "o"]);
+    expect(ipa("安")).toEqual(["ŋ", "a", "n"]);
+    // 裸韵母才是零声母：与 ng- 构成最小对立
+    expect(ipa("o3")).toEqual(["o"]);
+    expect(ipa("an1")).toEqual(["a", "n"]);
+    for (const t of ["ngo3", "ngan1", "ngai4", "nge2", "ngou3", "ngiu3"]) {
+      for (const s of gy.toPhrases(t)[0].segments.flatMap((x) => [...x.ipa])) {
+        expect(["\u0303", "ã", "õ", "ẽ", "ĩ", "ũ", "ỹ", "ɑ̃", "ɛ̃"].includes(s)).toBe(false);
+      }
+    }
+  });
+
   test("tone 2 falls in Guiyang and rises in Mandarin", () => {
     expect(pitch("gue2", "guiyang")[1] < pitch("gue2", "guiyang")[0]).toBe(true); // 21
     expect(pitch("gue2", "mandarin")[1] > pitch("gue2", "mandarin")[0]).toBe(true); // 35

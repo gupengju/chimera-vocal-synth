@@ -8,6 +8,9 @@
 //!   * `iu` is [iəu] (as in Mandarin) and `iw` is the dialect's [iu]; `io`, `ue` are new rhymes;
 //!   * `ŋ` onsets are spelled `ng` (安 ngan¹ = [ŋan]); a bare final (a¹) is true zero-initial,
 //!     so 爱 ngai⁴ [ŋai] and ai⁴ [ai] stay distinct.
+//!   * `ŋ` is a consonant segment on the same tier as m/n/p/t; the following vowel stays oral.
+//!     The onset ŋ does NOT nasalize the vowel — vowel nasalization (ã õ …) is a separate
+//!     rhyme-layer feature, never attached to an ŋ onset (ngo³ = ŋ + o, not ŋ + õ).
 //!
 //! Tones are 55 / 21 / 42 / 13 (planner `ToneScheme::Guiyang`). No tone sandhi yet.
 
@@ -431,9 +434,35 @@ mod tests {
         assert_eq!(ipa("nga1"), "ŋa1");
         assert_eq!(ipa("ngan1"), "ŋan1");
         assert_eq!(ipa("ngo2"), "ŋo2");
+        assert_eq!(ipa("ngo3"), "ŋo3");
         assert_eq!(ipa("ngiu3"), "ŋiəu3");
         assert_eq!(ipa("a1"), "a1");
         assert!(syllable("zhong1").is_none()); // 方言没有 zh
+    }
+
+    #[test]
+    fn ŋ_onset_is_consonant_vowel_stays_oral() {
+        // ngo³ = ŋ + o：ŋ 是独立辅音音段（与 m/n/p/t 同级），后面的 o 是口元音，
+        // 不带鼻化；ŋ 声母不触发元音鼻化（鼻化是韵母层的独立特征）。
+        let (segs, tone) = syllable("ngo3").unwrap();
+        assert_eq!(tone, 3);
+        assert_eq!(segs.len(), 2);
+        assert_eq!(segs[0].ipa, "ŋ");
+        assert!(segs[0].aspirated.is_none()); // 响音不送气
+        assert!(segs[0].tone.is_none());      // 辅音不承担声调
+        assert_eq!(segs[1].ipa, "o");
+        assert!(segs[1].tone.is_some());      // o 是带调韵核
+        assert!(!["n", "ŋ"].contains(&segs[1].ipa.as_str()));
+        assert!(!segs[1].ipa.contains('\u{0303}')); // 无鼻化波浪号
+
+        // ngan¹ = ŋ + a + n：鼻音色彩来自末尾 n 韵尾，不是 ŋ 声母把 a 鼻化。
+        let (segs, _) = syllable("ngan1").unwrap();
+        assert_eq!(
+            segs.iter().map(|s| s.ipa.as_str()).collect::<Vec<_>>(),
+            vec!["ŋ", "a", "n"]
+        );
+        assert_eq!(segs[1].ipa, "a");
+        assert!(!segs[1].ipa.contains('\u{0303}'));
     }
 
     #[test]
