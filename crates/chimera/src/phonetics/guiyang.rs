@@ -6,7 +6,8 @@
 //!   * `b d g` are voiceless unaspirated [p t k]; `z c s` are alveolar [ts tsʰ s], `r` is [z];
 //!   * `e` is [ɛ], `o` is [o] (no [w] glide), `ong` is [oŋ], `iong` is [ioŋ];
 //!   * `iu` is [iəu] (as in Mandarin) and `iw` is the dialect's [iu]; `io`, `ue` are new rhymes;
-//!   * `ŋ` onsets are written with no initial letter (安 an¹ = [ŋan] on paper = [an] here).
+//!   * `ŋ` onsets are spelled `ng` (安 ngan¹ = [ŋan]); a bare final (a¹) is true zero-initial,
+//!     so 爱 ngai⁴ [ŋai] and ai⁴ [ai] stay distinct.
 //!
 //! Tones are 55 / 21 / 42 / 13 (planner `ToneScheme::Guiyang`). No tone sandhi yet.
 
@@ -46,6 +47,8 @@ fn initial(i: &str) -> Option<(&'static str, Option<bool>)> {
         "c" => ("ts", Some(true)),
         "s" => ("s", None),
         "r" => ("z", None),
+        // 书上的零声母写法不带字母，真正的 ŋ- 声母写 ng（安 ngan¹ = [ŋan]，爱 ngai⁴ 与 ai⁴ 对立）
+        "ng" => ("ŋ", None),
         _ => return None,
     })
 }
@@ -146,8 +149,12 @@ pub fn syllable(s: &str) -> Option<(Vec<Segment>, u8)> {
             base.push(if c == 'v' { 'ü' } else { c });
         }
     }
-    // the dialect has only single-letter initials (zh/ch/sh/n are merged away)
-    let ini = base.get(..1).filter(|i| "bpmfdtnlgkhjqxzcsr".contains(*i));
+    // 声母：两字母的 ng 优先，其余单字母（zh/ch/sh 已并入别的声母）
+    let ini = if base.starts_with("ng") {
+        Some("ng")
+    } else {
+        base.get(..1).filter(|i| "bpmfdtnlgkhjqxzcsr".contains(*i))
+    };
     let (ini, rest) = match ini {
         Some(i) => (i, &base[i.len()..]),
         None => ("", base.as_str()),
@@ -272,14 +279,15 @@ impl GuiyangG2P {
         GuiyangG2P::default()
     }
 
-    /// The dictionary as text ("汉字\tpīn yīn" lines).
+    /// The dictionary as text ("词形\t读音" lines). 同一词形可以有多行（多读音），先出现的
+    /// 那条是默认读音，后面的忽略——装载顺序按语料顺序，不按行尾覆盖。
     pub fn load_dict(&mut self, text: &str) {
         let mut m = HashMap::new();
         let mut max_len = 1;
         for line in text.split('\n') {
             if let Some((k, v)) = line.split_once('\t') {
                 max_len = max_len.max(k.chars().count());
-                m.insert(k.to_string(), v.to_string());
+                m.entry(k.to_string()).or_insert_with(|| v.to_string());
             }
         }
         self.dict = Some(m);
@@ -320,8 +328,9 @@ impl GuiyangG2P {
                 continue;
             };
             let readings: Vec<&str> = p.split_whitespace().collect();
-            if readings.len() == n {
-                let syls = readings.iter().zip(&run[i..i + n]).filter_map(|(r, _)| syllable(r).map(|(segs, tone)| Syl { segs, tone })).collect();
+            let syls: Vec<Syl> = readings.iter().filter_map(|r| syllable(r).map(|(segs, tone)| Syl { segs, tone })).collect();
+            // 词形与音节数不必相等：合音词（不要 → biao4）两字一音节
+            if !syls.is_empty() && syls.len() == readings.len() {
                 words.push((w, syls));
             }
             i += n;
@@ -418,6 +427,12 @@ mod tests {
         assert_eq!(ipa("yuan2"), "yan2");
         assert_eq!(ipa("we2"), "uɛ2");
         assert_eq!(ipa("er4"), "ɚ4");
+        // ŋ 声母写 ng，裸韵母是零声母：两者不合并
+        assert_eq!(ipa("nga1"), "ŋa1");
+        assert_eq!(ipa("ngan1"), "ŋan1");
+        assert_eq!(ipa("ngo2"), "ŋo2");
+        assert_eq!(ipa("ngiu3"), "ŋiəu3");
+        assert_eq!(ipa("a1"), "a1");
         assert!(syllable("zhong1").is_none()); // 方言没有 zh
     }
 
