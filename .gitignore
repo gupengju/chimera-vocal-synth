@@ -2,6 +2,7 @@ node_modules
 dist
 out
 *.wav
+*.bak*
 .DS_Store
 target/
 src/wasm/chimera.wasm
