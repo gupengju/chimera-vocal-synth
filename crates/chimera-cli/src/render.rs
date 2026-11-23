@@ -275,11 +275,15 @@ pub fn guiyang(ctx: &Ctx, a: &[String]) -> Result<(), String> {
 /// One entry point with the language named first — the explicit choice between the three
 /// frontends. `render say <mandarin|english|guiyang> <out> ["text"] [body]`
 pub fn say_lang(ctx: &Ctx, a: &[String]) -> Result<(), String> {
-    match arg(a, 0, "mandarin") {
-        "mandarin" => mandarin(ctx, &a[1.min(a.len())..]),
-        "guiyang" => guiyang(ctx, &a[1.min(a.len())..]),
-        "english" => text(ctx, &a[1.min(a.len())..]),
-        l => Err(format!("unknown language {l:?}; have mandarin, guiyang, english")),
+    // 语言必须显式给出（与 C++ 的 chimera_synth 同一规则），缺省不再默认成普通话。
+    match a.first().map(String::as_str) {
+        Some("mandarin") => mandarin(ctx, &a[1.min(a.len())..]),
+        Some("guiyang") => guiyang(ctx, &a[1.min(a.len())..]),
+        Some("english") => text(ctx, &a[1.min(a.len())..]),
+        Some(l) => Err(format!(
+            "unknown language {l:?}; have mandarin, guiyang, english — the language is required and comes first: render say <lang> <out> [\"text\"] [body]"
+        )),
+        None => Err("language is required: mandarin | guiyang | english".into()),
     }
 }
 

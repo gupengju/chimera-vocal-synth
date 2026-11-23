@@ -217,14 +217,16 @@ impl MandarinG2P {
         MandarinG2P::default()
     }
 
-    /// The dictionary as text ("汉字\tpīn yīn" lines).
+    /// The dictionary as text ("汉字\tpīn yīn" lines). A CRLF file loads the same as an LF one.
     pub fn load_dict(&mut self, text: &str) {
         let mut m = HashMap::new();
         let mut max_len = 1;
         for line in text.split('\n') {
+            // a CRLF dictionary leaves a '\r' on the reading; it would fail the last syllable
+            let line = line.trim_end_matches(['\r', ' ', '\t']);
             if let Some((k, v)) = line.split_once('\t') {
                 max_len = max_len.max(k.chars().count());
-                m.insert(k.to_string(), v.to_string());
+                m.insert(k.trim().to_string(), v.trim().to_string());
             }
         }
         self.dict = Some(m);
@@ -264,7 +266,7 @@ impl MandarinG2P {
                 i += 1;
                 continue;
             };
-            let readings: Vec<&str> = p.split(' ').collect();
+            let readings: Vec<&str> = p.split_whitespace().collect();
             if readings.len() == n {
                 let syls = readings.iter().zip(&run[i..i + n]).filter_map(|(r, &h)| syllable(r).map(|(segs, tone)| Syl { segs, tone, han: Some(h), text: h.to_string() })).collect();
                 words.push((w, syls));

@@ -19,6 +19,8 @@ usage: chimera <command> [args] [--float]
   render speech  <out> [\"ipa / ipa\"] [male|female|child]
   render text    <out> [\"English text.\"] [male|female|child]
   render mandarin <out> [\"你好。 or ni3 hao3.\"] [male|female|child]
+  render guiyang <out> [\"国角。 or gue2 jio2.\"] [male|female|child]
+  render say     <mandarin|guiyang|english> <out> [\"text\"] [male|female|child]
   render song    [outdir] [male|female|child]
   render notes   <in.json> <out> [male|female|child] [--artic tracks.json] [--tele voice.tele]
                  (melody file; midi <= 0 is a rest; --artic also writes the articulators at 100 Hz)
