@@ -113,15 +113,32 @@ export function isMandarin(text: string): boolean {
 export class GuiyangG2P {
   private loading: Promise<void> | null = null;
 
-  load(url = "/data/guiyang.txt.gz"): Promise<void> {
-    this.loading ??= fetchDictionary(url).then(
-      (text) => this.setDictionaryText(text),
+  /**
+   * Fetch the dictionary and the rules. The rules are a text table
+   * (`public/data/guiyang.rules.txt`) the page picks up at run time, so an edit needs no rebuild;
+   * a missing or broken table leaves the copy the engine was built with in force.
+   */
+  load(url = "/data/guiyang.txt.gz", rulesUrl = "/data/guiyang.rules.txt"): Promise<void> {
+    this.loading ??= Promise.all([fetchDictionary(url).then((text) => this.setDictionaryText(text)), this.loadRules(rulesUrl)]).then(
+      () => undefined,
       (e) => {
         this.loading = null; // allow a retry
         throw e;
       },
     );
     return this.loading;
+  }
+
+  loadRules(url: string): Promise<void> {
+    return fetch(url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${url}: ${r.status}`))))
+      .then((text) => this.setRulesText(text))
+      .catch((e) => console.warn(`guiyang rules ${url}: ${e}`));
+  }
+
+  /** Replace the notation tables (the same parser the CLI uses). */
+  setRulesText(text: string): void {
+    call("guiyangRules", { text });
   }
 
   setDictionaryText(text: string): void {

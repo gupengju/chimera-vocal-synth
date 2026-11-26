@@ -63,9 +63,16 @@ pub fn mandarin_g2p() -> Result<MandarinG2P, String> {
     Ok(g)
 }
 
-/// The Guiyang dictionary (`public/data/guiyang.txt.gz`) loaded into a G2P.
+/// The Guiyang dictionary (`public/data/guiyang.txt.gz`) loaded into a G2P, with the notation
+/// tables read from `public/data/guiyang.rules.txt` at run time (edit the file, rerun, hear it).
 pub fn guiyang_g2p() -> Result<GuiyangG2P, String> {
     let mut g = GuiyangG2P::new();
+    let rules = repo_path("public/data/guiyang.rules.txt");
+    match std::fs::read_to_string(&rules) {
+        Ok(text) => g.set_rules_text(&text)?,
+        // a build without public/ still speaks, on the copy embedded at compile time
+        Err(e) => eprintln!("{rules}: {e}; using the embedded tables (they may be stale)"),
+    }
     g.load_dict(&gunzip("public/data/guiyang.txt.gz")?);
     Ok(g)
 }

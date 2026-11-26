@@ -140,8 +140,14 @@ fn dispatch(st: &mut State, req: &Value) -> Res {
             st.gui.load_dict(&arg::<String>(req, "text")?);
             Ok(json!(true))
         }
+        // the dialect's tables (public/data/guiyang.rules.txt), so the page can pick up an edit
+        // without rebuilding the engine
+        "guiyangRules" => {
+            st.gui.set_rules_text(&arg::<String>(req, "text")?)?;
+            Ok(json!(true))
+        }
         "guiyangPhrases" => to_json(&st.gui.to_phrases(&arg::<String>(req, "text")?)),
-        "isGuiyang" => Ok(json!(chimera::phonetics::guiyang::is_guiyang(&arg::<String>(req, "text")?))),
+        "isGuiyang" => Ok(json!(st.gui.is_guiyang(&arg::<String>(req, "text")?))),
         "lyricsToSyllables" => {
             let text: String = arg(req, "text")?;
             if chimera::phonetics::mandarin::is_mandarin(&text) {

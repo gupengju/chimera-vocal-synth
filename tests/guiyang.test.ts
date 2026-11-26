@@ -12,6 +12,8 @@ const { GuiyangG2P, isGuiyang, isMandarin, planPhrases } = await import("../src/
 const { transcribe } = await import("../src/ui/words.ts");
 const gy = new GuiyangG2P();
 gy.setDictionaryText(gunzipSync(readFileSync(new URL("../public/data/guiyang.txt.gz", import.meta.url))).toString());
+// 规则表按当前文件加载（引擎里那份是编译时嵌入的同一份，可能落后于刚编辑过的文件）
+gy.setRulesText(readFileSync(new URL("../public/data/guiyang.rules.txt", import.meta.url)).toString());
 const male = { female: 0, child: 0 };
 const tones = (text: string) => gy.toPhrases(text).map((p) => p.segments.flatMap((s) => (s.tone ? [s.tone] : [])));
 const pitch = (text: string, toneScheme?: "mandarin" | "guiyang") =>

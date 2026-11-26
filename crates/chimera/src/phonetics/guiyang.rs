@@ -2,6 +2,11 @@
 //! tones. The notation is documented in `docs/DIALECT_NOTATION.md` of the C++ port; both trees
 //! implement the same tables ( `tools/notation_check.py` pins them to `ipa5.csv`).
 //!
+//! **The tables are not here.** Initials, finals, the y/w spellings, the tone letters and the
+//! durations live in `public/data/guiyang.rules.txt`, parsed by [`super::guiyang_rules`]. This
+//! module only does the text side: characters → dictionary words, punctuation → phrases, and the
+//! per-syllable timing that the dialect's fixed nucleus length needs.
+//!
 //! Differences from Mandarin pinyin (not quirks — these are the dialect's phonology):
 //!   * `b d g` are voiceless unaspirated [p t k]; `z c s` are alveolar [ts tsʰ s], `r` is [z];
 //!   * `e` is [ɛ], `o` is [o] (no [w] glide), `ong` is [oŋ], `iong` is [ioŋ];
@@ -15,6 +20,7 @@
 //! Tones are 55 / 21 / 42 / 13 (planner `ToneScheme::Guiyang`). No tone sandhi yet.
 
 use super::english::Phrase;
+use super::guiyang_rules::{is_han, GuiyangRules};
 use super::{Intonation, Segment};
 use std::collections::HashMap;
 
@@ -24,249 +30,8 @@ struct Syl {
     tone: u8,
 }
 
-fn is_han(c: char) -> bool {
-    ('\u{4E00}'..='\u{9FFF}').contains(&c) || c == '〇'
-}
-
-/// initial spelling → (IPA, aspirated). `None` = no aspiration contrast (sonorants, fricatives).
-fn initial(i: &str) -> Option<(&'static str, Option<bool>)> {
-    Some(match i {
-        "b" => ("p", Some(false)),
-        "p" => ("p", Some(true)),
-        "m" => ("m", None),
-        "f" => ("f", None),
-        "d" => ("t", Some(false)),
-        "t" => ("t", Some(true)),
-        "n" => ("n", None),
-        "l" => ("l", None),
-        "g" => ("k", Some(false)),
-        "k" => ("k", Some(true)),
-        "h" => ("x", None),
-        "j" => ("tɕ", Some(false)),
-        "q" => ("tɕ", Some(true)),
-        "x" => ("ɕ", None),
-        // the book's ʦ/ʦʰ are alveolar, not the dental [ts̪] of Mandarin z/c
-        "z" => ("ts", Some(false)),
-        "c" => ("ts", Some(true)),
-        "s" => ("s", None),
-        "r" => ("z", None),
-        // 书上的零声母写法不带字母，真正的 ŋ- 声母写 ng（安 ngan¹ = [ŋan]，爱 ngai⁴ 与 ai⁴ 对立）
-        "ng" => ("ŋ", None),
-        _ => return None,
-    })
-}
-
-/// Canonical final → segments. A run of vowels stays one segment (the planner expands it with
-/// equal weights); a nasal coda is its own segment.
-fn final_ipa(f: &str) -> Option<&'static [&'static str]> {
-    Some(match f {
-        "a" => &["a"],
-        "o" => &["o"],
-        "e" => &["ɛ"],
-        "i" => &["i"],
-        "u" => &["u"],
-        "ü" => &["y"],
-        "ai" => &["ai"],
-        "ei" => &["ei"],
-        "ao" => &["ɑu"],
-        "ou" => &["əu"],
-        "an" => &["a", "n"],
-        "en" => &["ə", "n"],
-        "ang" => &["ɑ", "ŋ"],
-        "ong" => &["o", "ŋ"],
-        "er" => &["ɚ"],
-        "ia" => &["ia"],
-        "ie" => &["iɛ"],
-        "io" => &["io"],
-        "iw" => &["iu"],
-        "iu" => &["iəu"],
-        "iao" => &["iɑu"],
-        "ian" => &["ia", "n"],
-        "in" => &["i", "n"],
-        "iang" => &["iɑ", "ŋ"],
-        "iong" => &["io", "ŋ"],
-        "ua" => &["ua"],
-        "ue" => &["uɛ"],
-        "ui" => &["uei"],
-        "uai" => &["uai"],
-        "uan" => &["ua", "n"],
-        "un" => &["uə", "n"],
-        "uang" => &["uɑ", "ŋ"],
-        "üe" => &["yɛ"],
-        "üan" => &["ya", "n"],
-        "ün" => &["y", "n"],
-        // the apical vowel of zi/ci/si/ri, written ɿ in the book
-        "-i" => &["ɨ"],
-        _ => return None,
-    })
-}
-
-/// Zero-initial spellings: the y/w letter is orthography only, the value has no medial.
-fn final_zero(s: &str) -> Option<&'static [&'static str]> {
-    Some(match s {
-        "a" | "ai" | "an" | "ang" | "ao" | "e" | "en" | "er" | "o" | "ou" => final_ipa(s)?,
-        "ong" => &["o", "ŋ"],
-        "yi" => &["i"],
-        "ya" => &["ia"],
-        "ye" => &["iɛ"],
-        "yo" => &["io"],
-        "yao" => &["iɑu"],
-        "you" => &["iəu"],
-        "yan" => &["ia", "n"],
-        "yin" => &["i", "n"],
-        "yang" => &["iɑ", "ŋ"],
-        "yong" => &["io", "ŋ"],
-        "yu" => &["y"],
-        "yue" => &["yɛ"],
-        "yuan" => &["ya", "n"],
-        "yun" => &["y", "n"],
-        "wu" => &["u"],
-        "wa" => &["ua"],
-        "we" => &["uɛ"],
-        "wai" => &["uai"],
-        "wei" => &["uei"],
-        "wan" => &["ua", "n"],
-        "wen" => &["uə", "n"],
-        "wang" => &["uɑ", "ŋ"],
-        _ => return None,
-    })
-}
-
-/// Tone-marked vowel → (vowel, tone).
-fn unmark(c: char) -> Option<(char, u8)> {
-    const MARKS: [(&str, char); 6] = [("āáǎà", 'a'), ("ēéěè", 'e'), ("īíǐì", 'i'), ("ōóǒò", 'o'), ("ūúǔù", 'u'), ("ǖǘǚǜ", 'ü')];
-    MARKS.iter().find_map(|(m, v)| m.chars().position(|x| x == c).map(|k| (*v, k as u8 + 1)))
-}
-
-/// One syllable (lowercase, tone mark or trailing digit) → its segments and tone.
-pub fn syllable(s: &str) -> Option<(Vec<Segment>, u8)> {
-    let mut tone = 5u8;
-    let mut base = String::new();
-    for c in s.chars() {
-        if let Some((v, t)) = unmark(c) {
-            base.push(v);
-            tone = t;
-        } else if let Some(d) = c.to_digit(10) {
-            tone = if (1..=4).contains(&d) { d as u8 } else { 5 };
-        } else {
-            base.push(if c == 'v' { 'ü' } else { c });
-        }
-    }
-    // 声母：两字母的 ng 优先，其余单字母（zh/ch/sh 已并入别的声母）
-    let ini = if base.starts_with("ng") {
-        Some("ng")
-    } else {
-        base.get(..1).filter(|i| "bpmfdtnlgkhjqxzcsr".contains(*i))
-    };
-    let (ini, rest) = match ini {
-        Some(i) => (i, &base[i.len()..]),
-        None => ("", base.as_str()),
-    };
-    let parts: &[&str] = if ini.is_empty() {
-        // y/w spellings first; a bare final ("ian", "u") is the same value without medial letters
-        final_zero(base.as_str()).or_else(|| final_ipa(base.as_str()))?
-    } else {
-        // j/q/x + u is [y] (ju qu xu = [tɕy tɕʰy ɕy]); z/c/s/r + i is the apical vowel
-        let fin: String = if matches!(ini, "j" | "q" | "x") && rest.starts_with('u') {
-            format!("ü{}", &rest[1..])
-        } else if matches!(ini, "z" | "c" | "s" | "r") && rest == "i" {
-            "-i".into()
-        } else {
-            rest.to_string()
-        };
-        final_ipa(&fin)?
-    };
-    let mut out = Vec::with_capacity(4);
-    if !ini.is_empty() {
-        let (ipa, aspirated) = initial(ini)?;
-        out.push(Segment { aspirated, ..Segment::new(ipa) });
-    }
-    for p in parts {
-        let nucleus = !matches!(*p, "n" | "ŋ");
-        out.push(if nucleus { Segment { tone: Some(tone), stress: Some(if tone < 5 { 1 } else { 0 }), ..Segment::new(p) } } else { Segment::new(p) });
-    }
-    Some((out, tone))
-}
-
-/// A word → syllables: split at apostrophes and after tone digits, then by longest match.
-fn split_word(w: &str) -> Option<Vec<String>> {
-    let mut out = Vec::new();
-    let mut chunk = String::new();
-    let mut chunks = Vec::new();
-    for c in w.chars() {
-        if c == '\'' || c == '’' || c == '-' {
-            chunks.push(std::mem::take(&mut chunk));
-            continue;
-        }
-        chunk.push(c);
-        if c.is_ascii_digit() {
-            chunks.push(std::mem::take(&mut chunk));
-        }
-    }
-    chunks.push(chunk);
-    for c in chunks.iter().filter(|c| !c.is_empty()) {
-        let letters = c.trim_end_matches(|x: char| x.is_ascii_digit());
-        let cs: Vec<char> = letters.chars().collect();
-        let mut i = 0;
-        while i < cs.len() {
-            let n = (1..=(cs.len() - i).min(6)).rev().find(|&n| syllable(&cs[i..i + n].iter().collect::<String>()).is_some())?;
-            out.push(cs[i..i + n].iter().collect::<String>());
-            i += n;
-        }
-        if let Some(last) = out.last_mut() {
-            last.push_str(&c[letters.len()..]);
-        }
-    }
-    Some(out)
-}
-
 fn is_phrase_punct(c: char) -> bool {
     ".!?;:,，。！？；：、".contains(c)
-}
-
-fn is_pinyin_char(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '\'' || c == '’' || c == 'ü' || unmark(c).is_some()
-}
-
-/// Whether text is Guiyang pinyin (or characters): tone digits, tone marks or Han characters.
-pub fn is_guiyang(text: &str) -> bool {
-    text.chars().any(|c| is_han(c) || unmark(c).is_some()) || text.split(' ').any(|w| split_word(w).is_some())
-}
-
-/// Segment durations: the Mandarin speech model (fixed nucleus length twice a real speaker's,
-/// real mean consonant lengths) with the dialect's phoneme names. See `mandarin.rs` for the
-/// measurements that motivate the numbers.
-fn speech_durations(s: &mut Syl, last: bool) {
-    let coda = s.segs.last().is_some_and(|x| x.ipa == "n" || x.ipa == "ŋ");
-    let nucleus = s.segs.iter().position(|x| x.tone.is_some()).unwrap_or(s.segs.len());
-    for (i, x) in s.segs.iter_mut().enumerate() {
-        let ms = match x.ipa.as_str() {
-            _ if i == nucleus => {
-                let mut d = if s.tone == 5 { 120.0 } else { 150.0 };
-                if x.ipa.chars().count() > 1 {
-                    d += 40.0;
-                }
-                if coda {
-                    d -= 30.0;
-                }
-                if last { d * 1.5 } else { d }
-            }
-            "p" | "t" | "k" => {
-                if x.aspirated == Some(true) { 90.0 } else { 58.0 }
-            }
-            "ts" | "tɕ" if x.aspirated == Some(true) => 101.0,
-            "ts" | "tɕ" => 73.0,
-            "f" | "s" | "ɕ" | "x" => 100.0,
-            "m" => 63.0,
-            "l" => 46.0,
-            "z" => 67.0,
-            "n" | "ŋ" if i > nucleus => 67.0 * if last { 1.56 } else { 1.0 } * if s.tone == 5 { 0.85 } else { 1.0 },
-            "n" => 50.0,
-            "j" | "w" | "ɥ" if i > 0 => 30.0,
-            _ => 57.0,
-        };
-        x.dur = Some(ms / 1000.0);
-    }
 }
 
 /// Guiyang text (characters or notation) → phrases. Characters need the dictionary
@@ -275,11 +40,24 @@ fn speech_durations(s: &mut Syl, last: bool) {
 pub struct GuiyangG2P {
     dict: Option<HashMap<String, String>>,
     max_len: usize,
+    rules: GuiyangRules,
 }
 
 impl GuiyangG2P {
     pub fn new() -> GuiyangG2P {
         GuiyangG2P::default()
+    }
+
+    /// The tables in force (the embedded copy until [`Self::set_rules_text`] replaces them).
+    pub fn rules(&self) -> &GuiyangRules {
+        &self.rules
+    }
+
+    /// Replace the tables from the text of `public/data/guiyang.rules.txt`. A bad file is an error
+    /// (with the line number) and leaves the previous tables in force.
+    pub fn set_rules_text(&mut self, text: &str) -> Result<(), String> {
+        self.rules = GuiyangRules::parse(text)?;
+        Ok(())
     }
 
     /// The dictionary as text ("词形\t读音" lines). 同一词形可以有多行（多读音），先出现的
@@ -307,7 +85,7 @@ impl GuiyangG2P {
             if is_phrase_punct(c) {
                 self.flush(&mut cur, Some(c), &mut phrases);
             } else if let Some(d) = c.to_digit(10).filter(|_| !prev.is_some_and(char::is_alphabetic)) {
-                cur.push("零一二三四五六七八九".chars().nth(d as usize).unwrap());
+                cur.push(self.rules.digits[d as usize]);
             } else {
                 cur.push(c);
             }
@@ -315,6 +93,11 @@ impl GuiyangG2P {
         }
         self.flush(&mut cur, None, &mut phrases);
         phrases
+    }
+
+    /// Whether text is Guiyang notation or characters.
+    pub fn is_guiyang(&self, text: &str) -> bool {
+        self.rules.is_guiyang(text)
     }
 
     /// Characters → dictionary words by forward maximum matching (unknown characters are skipped).
@@ -331,7 +114,7 @@ impl GuiyangG2P {
                 continue;
             };
             let readings: Vec<&str> = p.split_whitespace().collect();
-            let syls: Vec<Syl> = readings.iter().filter_map(|r| syllable(r).map(|(segs, tone)| Syl { segs, tone })).collect();
+            let syls: Vec<Syl> = readings.iter().filter_map(|r| self.rules.syllable(r).map(|(segs, tone)| Syl { segs, tone })).collect();
             // 词形与音节数不必相等：合音词（不要 → biao4）两字一音节
             if !syls.is_empty() && syls.len() == readings.len() {
                 words.push((w, syls));
@@ -349,7 +132,7 @@ impl GuiyangG2P {
         for w in words.iter_mut() {
             for s in w.1.iter_mut() {
                 k += 1;
-                speech_durations(s, k == n);
+                self.rules.speech_durations(&mut s.segs, s.tone, k == n);
             }
         }
         let mut segs = Vec::new();
@@ -368,10 +151,7 @@ impl GuiyangG2P {
             return;
         }
         let q = matches!(delim, Some('?' | '？'));
-        let pause = match delim {
-            Some('.' | '!' | '?' | '。' | '！' | '？') | None => 0.35,
-            _ => 0.18,
-        };
+        let pause = if matches!(delim, Some('.' | '!' | '?' | '。' | '！' | '？') | None) { self.rules.pause_sentence } else { self.rules.pause_clause };
         phrases.push(Phrase { segments: segs, intonation: if q { Intonation::Question } else { Intonation::Statement }, pause, words: said });
     }
 
@@ -387,13 +167,13 @@ impl GuiyangG2P {
                     i += 1;
                 }
                 self.han_words(&chars[start..i], &mut words);
-            } else if is_pinyin_char(chars[i]) {
-                while i < chars.len() && is_pinyin_char(chars[i]) {
+            } else if self.rules.is_pinyin_char(chars[i]) {
+                while i < chars.len() && self.rules.is_pinyin_char(chars[i]) {
                     i += 1;
                 }
                 let w: String = chars[start..i].iter().collect();
-                if let Some(syls) = split_word(&w) {
-                    words.push((w, syls.iter().filter_map(|s| syllable(s).map(|(segs, tone)| Syl { segs, tone })).collect()));
+                if let Some(syls) = self.rules.split_word(&w) {
+                    words.push((w, syls.iter().filter_map(|s| self.rules.syllable(s).map(|(segs, tone)| Syl { segs, tone })).collect()));
                 }
             } else {
                 i += 1;
@@ -406,9 +186,16 @@ impl GuiyangG2P {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::phonetics::guiyang_rules::GuiyangRules;
+
+    /// The rules as they are on disk now (not the copy embedded at build time).
+    fn rules() -> GuiyangRules {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../public/data/guiyang.rules.txt");
+        GuiyangRules::parse(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
 
     fn ipa(s: &str) -> String {
-        let (segs, t) = syllable(s).unwrap();
+        let (segs, t) = rules().syllable(s).unwrap();
         let mut o: String = segs.iter().map(|x| format!("{}{}", x.ipa, if x.aspirated == Some(true) { "ʰ" } else { "" })).collect();
         o.push_str(&t.to_string());
         o
@@ -437,30 +224,27 @@ mod tests {
         assert_eq!(ipa("ngo3"), "ŋo3");
         assert_eq!(ipa("ngiu3"), "ŋiəu3");
         assert_eq!(ipa("a1"), "a1");
-        assert!(syllable("zhong1").is_none()); // 方言没有 zh
+        assert!(rules().syllable("zhong1").is_none()); // 方言没有 zh
     }
 
     #[test]
     fn ŋ_onset_is_consonant_vowel_stays_oral() {
         // ngo³ = ŋ + o：ŋ 是独立辅音音段（与 m/n/p/t 同级），后面的 o 是口元音，
         // 不带鼻化；ŋ 声母不触发元音鼻化（鼻化是韵母层的独立特征）。
-        let (segs, tone) = syllable("ngo3").unwrap();
+        let (segs, tone) = rules().syllable("ngo3").unwrap();
         assert_eq!(tone, 3);
         assert_eq!(segs.len(), 2);
         assert_eq!(segs[0].ipa, "ŋ");
         assert!(segs[0].aspirated.is_none()); // 响音不送气
-        assert!(segs[0].tone.is_none());      // 辅音不承担声调
+        assert!(segs[0].tone.is_none()); // 辅音不承担声调
         assert_eq!(segs[1].ipa, "o");
-        assert!(segs[1].tone.is_some());      // o 是带调韵核
+        assert!(segs[1].tone.is_some()); // o 是带调韵核
         assert!(!["n", "ŋ"].contains(&segs[1].ipa.as_str()));
         assert!(!segs[1].ipa.contains('\u{0303}')); // 无鼻化波浪号
 
         // ngan¹ = ŋ + a + n：鼻音色彩来自末尾 n 韵尾，不是 ŋ 声母把 a 鼻化。
-        let (segs, _) = syllable("ngan1").unwrap();
-        assert_eq!(
-            segs.iter().map(|s| s.ipa.as_str()).collect::<Vec<_>>(),
-            vec!["ŋ", "a", "n"]
-        );
+        let (segs, _) = rules().syllable("ngan1").unwrap();
+        assert_eq!(segs.iter().map(|s| s.ipa.as_str()).collect::<Vec<_>>(), vec!["ŋ", "a", "n"]);
         assert_eq!(segs[1].ipa, "a");
         assert!(!segs[1].ipa.contains('\u{0303}'));
     }
@@ -468,18 +252,40 @@ mod tests {
     #[test]
     fn every_syllable_has_one_toned_nucleus() {
         for s in ["a", "jio", "qiw", "gue", "iang", "iong", "uan", "yu", "zi"] {
-            let (segs, _) = syllable(s).unwrap();
+            let (segs, _) = rules().syllable(s).unwrap();
             assert_eq!(segs.iter().filter(|x| x.tone.is_some()).count(), 1, "{s}");
         }
     }
 
     #[test]
     fn words() {
-        assert_eq!(split_word("jio2").unwrap(), vec!["jio2".to_string()]);
-        assert_eq!(split_word("zhong1").is_none(), true); // 方言没有 zh
+        let r = rules();
+        assert_eq!(r.split_word("jio2").unwrap(), vec!["jio2".to_string()]);
+        assert!(r.split_word("zhong1").is_none()); // 方言没有 zh
         let p = GuiyangG2P::new().to_phrases("gue2 jio2, qiw2 ma?");
         assert_eq!(p.len(), 2);
         assert_eq!(p[0].segments.len(), 4); // k uɛ | tɕ io
         assert_eq!(p[1].intonation, Intonation::Question);
+    }
+
+    #[test]
+    fn the_rules_file_is_the_source_of_truth() {
+        // 文件里的表就是引擎的表：新增一个韵母不用改 Rust。
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../public/data/guiyang.rules.txt");
+        let mut text = std::fs::read_to_string(path).unwrap();
+        text = text.replace("[finals]\n", "[finals]\nzz  k\n");
+        let edited = GuiyangRules::parse(&text).unwrap();
+        let (segs, _) = edited.syllable("bzz1").unwrap();
+        assert_eq!(segs.iter().map(|s| s.ipa.as_str()).collect::<Vec<_>>(), vec!["p", "k"]);
+        // 运行时的替换走的是同一个解析器
+        let mut g = GuiyangG2P::new();
+        g.set_rules_text(&text).unwrap();
+        assert_eq!(g.rules().syllable("bzz1").unwrap().0.len(), 2);
+    }
+
+    #[test]
+    fn a_broken_line_names_its_line() {
+        let err = GuiyangRules::parse("[syllable]\nmax_length 6\n[initials]\nz\n").unwrap_err();
+        assert!(err.contains(":4:"), "{err}");
     }
 }

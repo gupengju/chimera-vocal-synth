@@ -1,0 +1,186 @@
+# 贵阳话（新派）记法 → 国际音标音素
+#
+# 这是贵阳话前端唯一的规则来源。crates/chimera/src/phonetics/guiyang_rules.rs 解析它；
+# 浏览器（Vite 把 public/ 挂在根路径）和 CLI（从仓库根读同一路径）都在运行时加载，
+# 改完不用重编译就能听。crates 里另嵌了一份同样的文本（include_str!）当保底，
+# 所以这个文件坏了不能让构建失败——但改错了会在加载时报出行号。
+#
+# 语法：
+#   # 注释            [section] 分节            一行 = 空白分隔的字段
+#   音素直接写 IPA 字符；一个韵母展开成两段（韵核 + 韵尾）时用空格隔开。
+#
+# 音系约定（改之前先读）：
+#   * b d g 是不送气 [p t k]，p t k 送气；z c s 是齿龈 [ts tsʰ s]（不是普通话的舌尖前）；
+#     r 是 [z]；j q x 是 [tɕ tɕʰ ɕ]；h 是 [x]。
+#   * e 是 [ɛ]，o 是 [o]（没有 [w] 介音），ong 是 [oŋ]；iu 是 [iəu]，iw 是方言的 [iu]。
+#   * ng 是真正的 ŋ 声母（安 ngan¹ = [ŋan]），裸韵母才是零声母（爱 ngai⁴ 与 ai⁴ 对立）。
+#     ŋ 与 m/n/p/t 同级，是独立辅音音段；它不使后面的元音鼻化（鼻化是韵母层的事）。
+#   * 声调 55/21/42/13，见 [tones]；planner 的 ToneScheme::Guiyang 用同一组调值。
+
+[syllable]
+# 一个音节记法的最长字母数（词内最长匹配的上限）
+max_length 6
+# 韵母里不带声调的辅音段（韵尾）：它们不当韵核、不吃 tone
+coda_phones n ŋ
+# 键盘打不出 ü 时用哪个字母代替（v：lve4 = lüe4）
+v_as v
+
+[initials]
+# 记法  音素  送气（缺省 = 这类声母没有送气对立）
+b   p    false
+p   p    true
+m   m
+f   f
+d   t    false
+t   t    true
+n   n
+l   l
+g   k    false
+k   k    true
+h   x
+j   tɕ   false
+q   tɕ   true
+x   ɕ
+z   ts   false
+c   ts   true
+s   s
+r   z
+ng  ŋ
+
+[finals]
+# 记法  音素（韵核在前，韵尾在后）
+a     a
+o     o
+e     ɛ
+i     i
+u     u
+ü     y
+ai    ai
+ei    ei
+ao    ɑu
+ou    əu
+an    a n
+en    ə n
+ang   ɑ ŋ
+ong   o ŋ
+er    ɚ
+ia    ia
+ie    iɛ
+io    io
+iw    iu
+iu    iəu
+iao   iɑu
+ian   ia n
+in    i n
+iang  iɑ ŋ
+iong  io ŋ
+ua    ua
+ue    uɛ
+ui    uei
+uai   uai
+uan   ua n
+un    uə n
+uang  uɑ ŋ
+üe    yɛ
+üan   ya n
+ün    y n
+# zi/ci/si/ri 的舌尖元音（书上写 ɿ）
+-i    ɨ
+
+[finals.zero]
+# 零声母的 y/w 写法：字母只是正字法，值里没有介音
+yi    i
+ya    ia
+ye    iɛ
+yo    io
+yao   iɑu
+you   iəu
+yan   ia n
+yin   i n
+yang  iɑ ŋ
+yong  io ŋ
+yu    y
+yue   yɛ
+yuan  ya n
+yun   y n
+wu    u
+wa    ua
+we    uɛ
+wai   uai
+wei   uei
+wan   ua n
+wen   uə n
+wang  uɑ ŋ
+
+[rewrite]
+# j q x 后接 u 的韵母按 ü 韵查表（ju qu xu = tɕy tɕʰy ɕy）
+palatal_u  j q x
+# z c s r 后的 i 是舌尖元音，改查韵母 -i
+apical_i   z c s r  -i
+
+[marks]
+# 元音 + 四个调号的写法（顺序 = 1 2 3 4 声）
+a   āáǎà
+e   ēéěè
+i   īíǐì
+o   ōóǒò
+u   ūúǔù
+ü   ǖǘǚǜ
+
+[tones]
+# 调号（记法里的数字）→ 调值（Chao 五度）；neutral 那个数字一律读轻声
+neutral  5
+1  55
+2  21
+3  42
+4  13
+
+[digits]
+# 汉字里夹的数字按这个读（2026 → 二零二六）
+0  零
+1  一
+2  二
+3  三
+4  四
+5  五
+6  六
+7  七
+8  八
+9  九
+
+[phrases]
+# 句末/分句后的停顿（秒）
+pause_sentence  0.35
+pause_clause    0.18
+
+[timing]
+# 音节内各段的时长（毫秒）。韵核按声调字 150、轻声 120 起算，韵母每多一个字符 +40，
+# 带韵尾 -30，短语末音节 ×1.5；韵尾鼻音 67，末音节 ×1.56，轻声 ×0.85。
+default              57
+vowel                150
+vowel_neutral        120
+diphthong_extra      40
+coda_shorten         30
+last_factor          1.5
+coda_nasal           67
+coda_last_factor     1.56
+coda_neutral_factor  0.85
+glide                30
+# 这些滑音在音节中段（i > 0）时用 glide 的时长
+glide_phones  j w ɥ
+
+[timing.phones]
+# 音素  时长  送气时的时长（缺省 = 同前）
+p   58   90
+t   58   90
+k   58   90
+ts  73   101
+tɕ  73   101
+f   100
+s   100
+ɕ   100
+x   100
+m   63
+n   50
+l   46
+z   67

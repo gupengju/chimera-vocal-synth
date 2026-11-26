@@ -9,6 +9,7 @@ pub mod beatbox;
 pub mod durations;
 pub mod english;
 pub mod guiyang;
+pub mod guiyang_rules;
 pub mod inventory;
 pub mod ipa;
 pub mod mandarin;

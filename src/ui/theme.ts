@@ -45,9 +45,11 @@ export const subscribeTheme = (cb: () => void): (() => void) => {
 /**
  * Run once at startup before first paint. main.tsx imports this module for its side effect;
  * the attribute is also set here so a saved light choice does not flash a black screen.
+ * Headless (the bun tests reach this through `colors.ts`) has no document to paint.
  */
 function boot(): void {
   setPalette(current);
+  if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = current;
 }
 

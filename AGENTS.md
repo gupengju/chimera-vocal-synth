@@ -36,6 +36,11 @@ and the CLI) under a React UI. See the README.
   airway's transfer functions re-bless; see `crates/chimera/tests/golden/README.md` for the rest.
 - **`*.generated.json` tables are regenerated (`chimera calibrate`, `tools/gen-*`), never edited.**
   Vowel calibration isn't bit-reproducible, so rerun it only when the formants should move.
+- **Guiyang notation is data, not code**: `public/data/guiyang.rules.txt` holds the dialect's
+  initials (with aspiration), finals, y/w spellings, tone letters, digit readings and durations.
+  The crate embeds the same text (`include_str!`) only as a fallback; the page and the CLI parse
+  the file at run time, so an edit takes effect without a rebuild. Check:
+  `cargo test --lib phonetics::guiyang` (it parses the file from disk, not the embedded copy).
 - **`src/wasm/chimera.wasm` is a gitignored build product.** After a Rust change, `bun test tests`
   alone tests the old engine: use `bun run test`. Don't share a cargo `target/` between checkouts.
 - **Gesture records are defined twice**, in `crates/chimera-wasm/src/lib.rs` and
