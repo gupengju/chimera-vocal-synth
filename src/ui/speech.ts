@@ -61,8 +61,8 @@ export function speakPhrases(phrases: { segments: Segment[]; intonation?: "state
   return current;
 }
 
-export async function speakText(text: string, o: { ipa: boolean; lang: SpeakLang; body: BodyMix; rate: number; f0: number }): Promise<SpokenPlan | null> {
-  if (!text.trim()) return null;
+/** text → phrases, through the front end the caller picked (loads the dictionary if it has one) */
+async function phrasesFor(text: string, o: { ipa: boolean; lang: SpeakLang }): Promise<{ phrases: Phrase[]; toneScheme?: "mandarin" | "guiyang" }> {
   let phrases: Phrase[];
   let toneScheme: "mandarin" | "guiyang" | undefined;
   if (o.ipa) phrases = ipaToPhrases(text);
@@ -89,8 +89,28 @@ export async function speakText(text: string, o: { ipa: boolean; lang: SpeakLang
     }
     phrases = g2p.toPhrases(text);
   }
+  return { phrases, toneScheme };
+}
+
+export async function speakText(text: string, o: { ipa: boolean; lang: SpeakLang; body: BodyMix; rate: number; f0: number }): Promise<SpokenPlan | null> {
+  if (!text.trim()) return null;
+  const { phrases, toneScheme } = await phrasesFor(text, o);
   if (!phrases.length) return null;
   return speakPhrases(phrases, { ...o, toneScheme });
+}
+
+/**
+ * Lay the text out on the score without sending anything to the voice: no schedule, no offset,
+ * id -1 (so the playhead and the mouth stay quiet). Used when a pick changes the text.
+ */
+export async function previewText(text: string, o: { ipa: boolean; lang: SpeakLang; body: BodyMix; rate: number; f0: number }): Promise<SpokenPlan | null> {
+  if (!text.trim()) return null;
+  const { phrases, toneScheme } = await phrasesFor(text, o);
+  if (!phrases.length) return null;
+  const plan = planPhrases(phrases, { body: o.body, t0: 0, rate: o.rate, f0: o.f0, toneScheme });
+  current = { plan, offset: null, id: -1, transcription: transcribe(phrases, toneScheme), words: wordSpans(phrases, plan) };
+  for (const l of listeners) l(current);
+  return current;
 }
 
 export function stopSpeaking(): void {

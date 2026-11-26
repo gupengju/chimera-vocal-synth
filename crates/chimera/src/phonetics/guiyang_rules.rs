@@ -7,11 +7,13 @@
 //!
 //! What the file owns: initials (and their aspiration), finals (and how a final expands into
 //! phonemes), the y/w spellings of zero-initial syllables, the j/q/x + u and z/c/s/r + i
-//! rewrites, the tone-mark letters, the tone-digit alphabet, the digit readings, the phrase
-//! pauses, and the per-phoneme durations. Glyph classification (what is a Han character, what
-//! is punctuation) stays in code — that is not phonology.
+//! rewrites, the tone-mark letters, the tone contours ([`Melody`]) with their 变音 rules, the
+//! tone-digit alphabet, the digit readings, the phrase pauses, and the per-phoneme durations.
+//! Glyph classification (what is a Han character, what is punctuation) stays in code — that is
+//! not phonology.
 
 use super::Segment;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The shipped rules, compiled in as a fallback (the file itself is the run-time source).
@@ -63,6 +65,58 @@ impl Default for Timing {
     }
 }
 
+/// A tone's pitch targets and the dialect's 变音 (tone-changing) rules, from `[tones]` and
+/// `[melody]`. Levels are Chao's five (1–5); the planner turns each into
+/// `base · 2^((level − 3) · chaostep / 12)` semitones.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Melody {
+    /// tone number → its levels, spread evenly over the rhyme ([tones])
+    pub contours: Vec<(u8, Vec<f64>)>,
+    /// the neutral tone's level after tone 1, 2, 3, 4, and with nothing before ([melody])
+    pub neutral: Vec<f64>,
+    /// semitones per Chao level: how wide the speaker's tonal range is
+    pub chaostep: f64,
+    /// how far the phrase's pitch falls from its first syllable to its last, semitones
+    pub declination: f64,
+    /// extra semitones on a question's last syllable
+    pub question_rise: f64,
+}
+
+impl Default for Melody {
+    /// The Guiyang defaults, identical to what the planner hard-coded before the file owned them.
+    fn default() -> Self {
+        Melody {
+            contours: vec![(1, vec![5.0, 5.0]), (2, vec![2.0, 1.0]), (3, vec![4.0, 2.0]), (4, vec![1.0, 3.0])],
+            neutral: vec![2.0, 3.0, 4.0, 1.0, 3.0],
+            chaostep: 2.5,
+            declination: 1.7,
+            question_rise: 3.0,
+        }
+    }
+}
+
+impl Melody {
+    /// The pitch targets of `tone` (a tone the table does not list is the neutral tone).
+    pub fn contour(&self, tone: u8, prev: Option<u8>) -> Vec<f64> {
+        match self.contours.iter().find(|(t, _)| *t == tone) {
+            Some((_, levels)) => levels.clone(),
+            None => self.neutral_after(prev),
+        }
+    }
+
+    /// The neutral tone has no level of its own: it takes the tail of the tone before it.
+    pub fn neutral_after(&self, prev: Option<u8>) -> Vec<f64> {
+        let i = match prev {
+            Some(1) => 0,
+            Some(2) => 1,
+            Some(3) => 2,
+            Some(4) => 3,
+            _ => 4,
+        };
+        vec![self.neutral.get(i).copied().unwrap_or(3.0)]
+    }
+}
+
 /// Everything `guiyang.rules.txt` declares.
 #[derive(Clone, Debug)]
 pub struct GuiyangRules {
@@ -83,6 +137,10 @@ pub struct GuiyangRules {
     pub marks: Vec<(char, char, u8)>,
     pub neutral: u8,
     pub toned: Vec<u8>,
+    /// the tone contours and the 变音 rules ([tones] + [melody])
+    pub melody: Melody,
+    /// 连读变调 rules: (tone before, tone, surface tone) ([sandhi])
+    pub sandhi: Vec<(u8, u8, u8)>,
     /// 0–9 → the character that reads it
     pub digits: [char; 10],
     pub pause_sentence: f64,
@@ -115,6 +173,8 @@ impl GuiyangRules {
             marks: Vec::new(),
             neutral: 5,
             toned: Vec::new(),
+            melody: Melody { contours: Vec::new(), ..Melody::default() },
+            sandhi: Vec::new(),
             digits: [' '; 10],
             pause_sentence: 0.35,
             pause_clause: 0.18,
@@ -199,11 +259,39 @@ impl GuiyangRules {
                     } else {
                         let t = f[0].parse::<u8>().map_err(|_| at(format!("{:?} is not a tone", f[0])))?;
                         let levels = word(1)?;
-                        if levels.len() < 2 || !levels.chars().all(|c| ('1'..='5').contains(&c)) {
-                            return Err(at(format!("tone {t}: levels are two to five digits 1–5, got {levels:?}")));
+                        if levels.len() < 1 || levels.len() > 5 || !levels.chars().all(|c| ('1'..='5').contains(&c)) {
+                            return Err(at(format!("tone {t}: levels are one to five digits 1–5, got {levels:?}")));
                         }
+                        if r.melody.contours.iter().any(|(k, _)| *k == t) {
+                            return Err(at(format!("tone {t} is declared twice")));
+                        }
+                        r.melody.contours.push((t, levels.chars().filter_map(|c| c.to_digit(10)).map(|d| d as f64).collect()));
                         r.toned.push(t);
                     }
+                }
+                "melody" => match f[0] {
+                    // 变音规则：轻声跟着前字调的尾巴走，句首没有前字
+                    k @ ("neutral_after1" | "neutral_after2" | "neutral_after3" | "neutral_after4" | "neutral_none") => {
+                        let i = if k == "neutral_none" { 4 } else { (k.as_bytes()[k.len() - 1] - b'1') as usize };
+                        if r.melody.neutral.len() < 5 {
+                            r.melody.neutral.resize(5, 3.0);
+                        }
+                        r.melody.neutral[i] = num(1)?;
+                    }
+                    "declination" => r.melody.declination = num(1)?,
+                    "question_rise" => r.melody.question_rise = num(1)?,
+                    "chaostep" => r.melody.chaostep = num(1)?,
+                    k => return Err(at(format!("unknown [melody] key {k:?}"))),
+                },
+                "sandhi" => {
+                    // "前字+本字 变调后的调类"
+                    let (p, t) = f[0]
+                        .split_once('+')
+                        .ok_or_else(|| at(format!("{:?} is not prev+tone", f[0])))?;
+                    let prev = p.parse::<u8>().map_err(|_| at(format!("{:?} is not a tone", p)))?;
+                    let tone = t.parse::<u8>().map_err(|_| at(format!("{:?} is not a tone", t)))?;
+                    let surface = f[1].parse::<u8>().map_err(|_| at(format!("{:?} is not a tone", f[1])))?;
+                    r.sandhi.push((prev, tone, surface));
                 }
                 "digits" => {
                     // "0 零": the digit, then the character that reads it
@@ -257,6 +345,16 @@ impl GuiyangRules {
 
     pub fn is_coda(&self, ipa: &str) -> bool {
         self.coda_phones.iter().any(|c| c == ipa)
+    }
+
+    /// The tone a syllable takes after a syllable of tone `prev` ([sandhi]; itself when no rule).
+    pub fn sandhi_after(&self, prev: u8, tone: u8) -> u8 {
+        self.sandhi.iter().find(|(p, t, _)| *p == prev && *t == tone).map_or(tone, |(_, _, s)| *s)
+    }
+
+    /// The contours and 变音 rules in force, for `PlanOptions::melody`.
+    pub fn melody(&self) -> Melody {
+        self.melody.clone()
     }
 
     pub fn unmark(&self, c: char) -> Option<(char, u8)> {

@@ -17,7 +17,10 @@
 //!     The onset ŋ does NOT nasalize the vowel — vowel nasalization (ã õ …) is a separate
 //!     rhyme-layer feature, never attached to an ŋ onset (ngo³ = ŋ + o, not ŋ + õ).
 //!
-//! Tones are 55 / 21 / 42 / 13 (planner `ToneScheme::Guiyang`). No tone sandhi yet.
+//! Tones are 55 / 21 / 42 / 13, and the 变音 rules (轻声 takes the tail of the tone before, the
+//! phrase's declination and a question's rise) live in the same file: `[tones]` + `[melody]`.
+//! `[sandhi]` (连读变调) is a table too — it is empty until the dialect's rules are measured, and
+//! [`flush`](GuiyangG2P) applies whatever it holds before the durations are computed.
 
 use super::english::Phrase;
 use super::guiyang_rules::{is_han, GuiyangRules};
@@ -51,6 +54,11 @@ impl GuiyangG2P {
     /// The tables in force (the embedded copy until [`Self::set_rules_text`] replaces them).
     pub fn rules(&self) -> &GuiyangRules {
         &self.rules
+    }
+
+    /// The tone contours and 变音 rules in force, for `PlanOptions::melody`.
+    pub fn melody(&self) -> super::guiyang_rules::Melody {
+        self.rules.melody()
     }
 
     /// Replace the tables from the text of `public/data/guiyang.rules.txt`. A bad file is an error
@@ -126,11 +134,26 @@ impl GuiyangG2P {
     fn flush(&self, cur: &mut String, delim: Option<char>, phrases: &mut Vec<Phrase>) {
         let mut words = self.words(cur);
         cur.clear();
-        // no tone sandhi in this dialect (21+21 → 21+55 is a later stage)
+        // 连读变调（`[sandhi]` 表）：前字调 + 本字调 → 后字的调类。表里没有这一对就不变。
         let n: usize = words.iter().map(|w| w.1.len()).sum();
         let mut k = 0;
+        let mut prev_tone: Option<u8> = None;
         for w in words.iter_mut() {
             for s in w.1.iter_mut() {
+                if let Some(p) = prev_tone {
+                    let t = self.rules.sandhi_after(p, s.tone);
+                    if t != s.tone {
+                        s.tone = t;
+                        // the nucleus carries the tone (and its note in the transcription)
+                        for seg in s.segs.iter_mut().rev() {
+                            if seg.tone.is_some() {
+                                seg.tone = Some(t);
+                                break;
+                            }
+                        }
+                    }
+                }
+                prev_tone = Some(s.tone);
                 k += 1;
                 self.rules.speech_durations(&mut s.segs, s.tone, k == n);
             }
@@ -287,5 +310,46 @@ mod tests {
     fn a_broken_line_names_its_line() {
         let err = GuiyangRules::parse("[syllable]\nmax_length 6\n[initials]\nz\n").unwrap_err();
         assert!(err.contains(":4:"), "{err}");
+    }
+
+    #[test]
+    fn a_sandhi_rule_in_the_file_rewrites_the_next_tone() {
+        // [sandhi] 是数据：写一行 4+4 → 2，去声连去声的后字就变成阳平（音高和注音都跟着走）
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../public/data/guiyang.rules.txt");
+        let mut text = std::fs::read_to_string(path).unwrap();
+        text.push_str("[sandhi]\n4+4  2\n");
+        let mut g = GuiyangG2P::new();
+        g.set_rules_text(&text).unwrap();
+        let tones: Vec<u8> = g.to_phrases("ke4 ke4。")[0].segments.iter().filter_map(|s| s.tone).collect();
+        assert_eq!(tones, vec![4, 2]);
+        // 表里没有的那一对不动
+        let tones: Vec<u8> = g.to_phrases("ke4 hao3。")[0].segments.iter().filter_map(|s| s.tone).collect();
+        assert_eq!(tones, vec![4, 3]);
+    }
+
+    #[test]
+    fn the_files_tone_levels_drive_the_pitch() {
+        // [tones] 的调值直接变 f0：把 2 声写成 33、并把降阶关掉，2 声的两个点就都落在基准音高上
+        use crate::phonetics::planner::{PhraseInput, PlanOptions, ToneScheme, plan_phrases};
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../public/data/guiyang.rules.txt");
+        let text = std::fs::read_to_string(path).unwrap().replace("\n2  21", "\n2  33") + "[melody]\ndeclination 0.0\n";
+        let r = GuiyangRules::parse(&text).unwrap();
+        assert_eq!(r.melody().contour(2, None), vec![3.0, 3.0]);
+        let g = GuiyangG2P::new();
+        let phrases: Vec<PhraseInput> = g.to_phrases("gue2。").into_iter().map(|p| PhraseInput { segments: p.segments, intonation: Some(p.intonation), pause: Some(p.pause) }).collect();
+        let plan = plan_phrases(
+            &phrases,
+            &PlanOptions { body: Default::default(), t0: 0.0, f0: Some(110.0), tone_scheme: Some(ToneScheme::Guiyang), melody: Some(r.melody()), ..Default::default() },
+        );
+        let pitches: Vec<f64> = plan
+            .gestures
+            .iter()
+            .filter(|x| x.targets.get(crate::control::score::ControlKey::F0).is_some())
+            .filter_map(|x| x.targets.get(crate::control::score::ControlKey::F0))
+            .collect();
+        assert!(!pitches.is_empty());
+        for f in &pitches {
+            assert!((f - 110.0).abs() < 1e-9, "{f} should be the base pitch");
+        }
     }
 }

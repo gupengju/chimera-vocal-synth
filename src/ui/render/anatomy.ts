@@ -270,9 +270,18 @@ export class AnatomyRenderer {
     for (const tr of G.trachea) line(tr, V.blueMid, 1);
     for (const r of G.rings) line(r, V.blueDim, 0.9);
 
-    // the airway's cross-section lines: lit by sound pressure, else a dim measurement grid
+    // the airway's cross-section lines: the grid draws a ladder of them, sound pressure heats
+    // them. They are not alternatives — the grid's rungs run a little past each wall, so its tick
+    // ends still read when pressure colours the same rungs
+    if (view.grid) {
+      for (const gs of f.grid) {
+        const [x0, y0] = this.P(gs.inner), [x1, y1] = this.P(gs.outer);
+        const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1;
+        const ex = (dx / l) * 3, ey = (dy / l) * 3;
+        seg(ctx, x0 - ex, y0 - ey, x1 + ex, y1 + ey, V.blueDim, 0.9, { alpha: 0.7 });
+      }
+    }
     if (view.pressure && tele) this.drawPressure(ctx, model, f, tele);
-    else if (view.grid) for (const gs of f.grid) seg(ctx, this.X(gs.inner), this.Y(gs.inner), this.X(gs.outer), this.Y(gs.outer), V.blueDim, 0.9, { alpha: 0.7 });
     if (view.particles && tele) this.drawParticles(ctx, model, f, tele, opts.dt);
 
     // afterglow: where the tongue, jaw and lips were a moment ago
@@ -444,17 +453,23 @@ export class AnatomyRenderer {
     }
   }
 
+  /** The narrowest place in the tract, measured: always shown when the calipers are on, so the
+   *  toggle is visible even with the tract wide open (it used to draw only below 1.2 cm²). */
   private drawCalipers(ctx: CanvasRenderingContext2D, f: HumanFrame): void {
     let mi = -1, ma = Infinity;
     for (let i = 2; i < f.grid.length - 1; i++) if (f.grid[i].area < ma) { ma = f.grid[i].area; mi = i; }
-    if (mi < 0 || ma >= 1.2) return;
+    if (mi < 0) return;
     const g = f.grid[mi];
     const [x0, y0] = this.P(g.inner), [x1, y1] = this.P(g.outer);
-    seg(ctx, x0, y0, x1, y1, V.white, 1.4, { hot: true });
-    const nx = -(y1 - y0), ny = x1 - x0, nl = Math.hypot(nx, ny) || 1;
-    for (const [x, y] of [[x0, y0], [x1, y1]]) seg(ctx, x - (nx / nl) * 4, y - (ny / nl) * 4, x + (nx / nl) * 4, y + (ny / nl) * 4, V.white, 1.2);
-    const lx = Math.max(x0, x1) + 10, ly = Math.min(y0, y1) - 4;
-    label(ctx, ma <= 0.0005 ? "CLOSED" : `${ma.toFixed(2)} CM²`, lx, ly, { size: 11, color: V.white, ls: 0.12 });
+    const dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy) || 1;
+    const ex = (dx / l) * 3, ey = (dy / l) * 3; // the measure runs past both walls, clear of the lip line
+    seg(ctx, x0 - ex, y0 - ey, x1 + ex, y1 + ey, V.white, 1.6, { hot: true });
+    const nx = (-dy / l) * 4, ny = (dx / l) * 4;
+    for (const [x, y] of [[x0 - ex, y0 - ey], [x1 + ex, y1 + ey]]) seg(ctx, x - nx, y - ny, x + nx, y + ny, V.white, 1.2);
+    // a leader to the reading, in the free space in front of the mouth
+    const lx = Math.max(x0, x1) + 16, ly = Math.min(y0, y1) - 6;
+    seg(ctx, (x0 + x1) / 2 + nx * 0.5, (y0 + y1) / 2 + ny * 0.5, lx - 3, ly + 3, V.white, 0.9, { alpha: 0.5 });
+    label(ctx, ma <= 0.0005 ? "CLOSED" : `${ma.toFixed(2)} CM²`, lx, ly, { size: 10, color: V.white, ls: 0.12, alpha: 0.9 });
   }
 
   private drawHandles(ctx: CanvasRenderingContext2D, model: VoiceModel, f: HumanFrame, a: HumanArtic, hover: HandleId | null, drag: HandleId | null): void {

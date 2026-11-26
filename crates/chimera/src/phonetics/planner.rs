@@ -6,6 +6,7 @@
 //! sequencer) builds into a caller's `Vec` and allocates nothing once it has capacity.
 
 use super::durations::{SegInfo, klatt_durations};
+use super::guiyang_rules::Melody;
 use super::inventory::{Glottal, Manner, PhonemeDef, Voicing, phoneme};
 use super::{Intonation, Plan, PlannedSegment, Segment};
 use crate::anatomy::human::{ArticKey, ArticPatch, BodyMix, BodyName};
@@ -163,6 +164,11 @@ pub struct PlanOptions {
     /// lexical tone contours: Mandarin 55/35/214/51 (the default) or Guiyang 55/21/42/13
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tone_scheme: Option<ToneScheme>,
+    /// the tone contours and 变音 rules of a written syllable system
+    /// (`public/data/guiyang.rules.txt`, `[tones]` + `[melody]`); unset keeps the built-in
+    /// Guiyang table, so an old caller plans exactly as before
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub melody: Option<Melody>,
 }
 
 /// How a phrase turns lexical tones into pitch targets.
@@ -419,12 +425,22 @@ pub fn plan_utterance(input: &[Segment], o: &PlanOptions) -> Plan {
             let ramp_in = prev.map_or(0.06, |k| js_max(0.03, t0 - times[rhyme_last(&segs, k)].t1));
             let ramp_out = next.map_or(0.06, |k| js_max(0.03, times[k].t0 - rhyme_end));
             let prog = (t0 - o.t0) / total;
-            let mut st = -1.7 * prog; // declination, ~1.7 semitones over the phrase
+            let mel = o.melody.as_ref();
+            let mut st = -mel.map_or(1.7, |m| m.declination) * prog; // declination over the phrase
             if next.is_none() && o.intonation == Some(Intonation::Question) {
-                st += 3.0;
+                st += mel.map_or(3.0, |m| m.question_rise);
             }
-            let levels = tone_contour(o.tone_scheme.unwrap_or_default(), tone, prev.and_then(|k| segs[k].tone), next.is_none());
-            tone_gestures(levels, t0, rhyme_end, ramp_in, ramp_out, f0 * crate::math::pow(2.0, st / 12.0), &mut gestures);
+            let levels = tone_contour(o.tone_scheme.unwrap_or_default(), mel, tone, prev.and_then(|k| segs[k].tone), next.is_none());
+            tone_gestures(
+                &levels,
+                t0,
+                rhyme_end,
+                ramp_in,
+                ramp_out,
+                f0 * crate::math::pow(2.0, st / 12.0),
+                mel.map_or(CHAO_STEP, |m| m.chaostep),
+                &mut gestures,
+            );
             continue;
         }
         if has_f0 {
@@ -511,28 +527,35 @@ fn closes_in_front(front: &str, back: &str) -> bool {
 }
 
 /// Semitones per step of Chao's five tone levels (level 3 is the speaker's base pitch): a male
-/// speaker's tonal range is about an octave, so 1–5 spans 10 semitones.
+/// speaker's tonal range is about an octave, so 1–5 spans 10 semitones. A [`Melody`] from the
+/// rules file may say otherwise (`chaostep`); this is the built-in value.
 const CHAO_STEP: f64 = 2.5;
 
 /// A tone's pitch targets (Chao levels, spread evenly over the rhyme). Mandarin: tone 3 is low
 /// (21) except phrase-finally (214). Guiyang: 55 / 21 / 42 / 13, level or falling on the nucleus.
 /// The neutral tone (5) is a short level set by the tone before, in both.
-fn tone_contour(scheme: ToneScheme, tone: u8, prev: Option<u8>, last: bool) -> &'static [f64] {
+/// A [`Melody`] from the rules file owns the Guiyang side; without one the table below stands.
+fn tone_contour(scheme: ToneScheme, melody: Option<&Melody>, tone: u8, prev: Option<u8>, last: bool) -> Vec<f64> {
+    if scheme == ToneScheme::Guiyang {
+        if let Some(m) = melody {
+            return m.contour(tone, prev);
+        }
+    }
     match scheme {
         ToneScheme::Mandarin => match tone {
-            1 => &[5.0, 5.0],
-            2 => &[3.0, 5.0],
-            3 if last => &[2.0, 1.0, 4.0],
-            3 => &[2.0, 1.0],
-            4 => &[5.0, 1.0],
-            _ => neutral_contour(prev),
+            1 => vec![5.0, 5.0],
+            2 => vec![3.0, 5.0],
+            3 if last => vec![2.0, 1.0, 4.0],
+            3 => vec![2.0, 1.0],
+            4 => vec![5.0, 1.0],
+            _ => neutral_contour(prev).to_vec(),
         },
         ToneScheme::Guiyang => match tone {
-            1 => &[5.0, 5.0],
-            2 => &[2.0, 1.0],
-            3 => &[4.0, 2.0],
-            4 => &[1.0, 3.0],
-            _ => neutral_contour(prev),
+            1 => vec![5.0, 5.0],
+            2 => vec![2.0, 1.0],
+            3 => vec![4.0, 2.0],
+            4 => vec![1.0, 3.0],
+            _ => neutral_contour(prev).to_vec(),
         },
     }
 }
@@ -562,7 +585,7 @@ fn rhyme_last(segs: &[Seg], i: usize) -> usize {
 /// Pitch gestures for a contour over the rhyme [a, b]: each level held for a fifth of the rhyme,
 /// cosine crossfades between them; `ramp_in` / `ramp_out` reach back and on over the consonants
 /// to the neighbouring rhymes, so consecutive tones crossfade there.
-fn tone_gestures(levels: &[f64], a: f64, b: f64, ramp_in: f64, ramp_out: f64, base: f64, out: &mut Vec<Gesture>) {
+fn tone_gestures(levels: &[f64], a: f64, b: f64, ramp_in: f64, ramp_out: f64, base: f64, chaostep: f64, out: &mut Vec<Gesture>) {
     let d = b - a;
     let h = 0.2 * d;
     let n = levels.len();
@@ -572,7 +595,7 @@ fn tone_gestures(levels: &[f64], a: f64, b: f64, ramp_in: f64, ramp_out: f64, ba
         let s1 = if k == n - 1 { b } else { s0 + h };
         let r_in = if k == 0 { ramp_in } else { gap };
         let r_out = if k == n - 1 { ramp_out } else { gap };
-        out.push(Gesture::new(s0, s1, r_in, r_out, 1.0, one(ControlKey::F0, base * crate::math::pow(2.0, (l - 3.0) * CHAO_STEP / 12.0))).label("pitch"));
+        out.push(Gesture::new(s0, s1, r_in, r_out, 1.0, one(ControlKey::F0, base * crate::math::pow(2.0, (l - 3.0) * chaostep / 12.0))).label("pitch"));
     }
 }
 

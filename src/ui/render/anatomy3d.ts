@@ -1235,7 +1235,7 @@ export class Anatomy3D {
       ma = f.grid[i].area;
       mi = i;
     }
-    if (mi < 0 || ma >= 1.2 || mi >= R.n) return;
+    if (mi < 0 || mi >= R.n) return;
     const P = this.tmp.reset();
     for (let i = 0; i <= 24; i++) {
       const an = (i / 24) * Math.PI * 2, c = Math.cos(an) * R.a[mi], sn = Math.sin(an) * R.b[mi];

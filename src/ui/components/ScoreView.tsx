@@ -54,7 +54,7 @@ export function ScoreView() {
     for (let i = 1; i <= ROWS.length + 1; i++) seg(ctx, left, top + rowH * i, right, top + rowH * i, V.frame, 1);
     if (!sp) {
       // on black over the rules, wrapped to the score's width
-      const msg = "说点什么，就能看到它的手势：哪个器官在动、什么时候动、怎么叠在一起。";
+      const msg = "说点什么，就能看到它的姿态：哪个器官在动、什么时候动、怎么叠在一起。";
       const cy = (top + bottom) / 2;
       const bh = wrapLabel(ctx, msg, right - left - 16, { size: 10, ls: 0.12 }).length * blockLineH(10) + 8;
       ctx.fillStyle = C.console;
@@ -123,5 +123,5 @@ export function ScoreView() {
       label(ctx, `${Math.max(0, now).toFixed(2)} 秒`, x + 8, top - 4, { size: 9, color: V.white, ls: 0.12, alpha: 0.8 });
     }
   });
-  return <canvas ref={ref} className="score-canvas" aria-label="当前话语的手势谱：哪个器官在动、什么时候动、怎么叠在一起" role="img" />;
+  return <canvas ref={ref} className="score-canvas" aria-label="当前话语的姿态谱：哪个器官在动、什么时候动、怎么叠在一起" role="img" />;
 }

@@ -35,9 +35,9 @@ export function Slider(props: {
   );
 }
 
-export function Toggle(props: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Toggle(props: { label: string; checked: boolean; onChange: (v: boolean) => void; title?: string }) {
   return (
-    <label className="toggle">
+    <label className="toggle" title={props.title}>
       <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
       <span>{props.label}</span>
     </label>

@@ -1683,6 +1683,24 @@ button.ghost:hover,
   text-shadow: var(--glow-blue);
 }
 
+/* on white the checked label only darkens by a shade, so an on toggle gets a filled ground
+   with white text — the state reads at a glance, off keeps just the frame */
+:root[data-theme="light"] .screen-tools .toggle span {
+  border-color: #4a8bb8;
+  color: #16456b;
+}
+:root[data-theme="light"] .screen-tools .toggle input:checked + span {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #ffffff;
+  text-shadow: none;
+  box-shadow: none;
+}
+:root[data-theme="light"] .screen-tools .toggle:hover input:not(:checked) + span {
+  background: rgba(10, 111, 194, 0.12);
+  color: #0a6fc2;
+}
+
 .screen-tools .toggle input:focus-visible + span {
   outline: 1px dashed var(--blue);
   outline-offset: 1px;

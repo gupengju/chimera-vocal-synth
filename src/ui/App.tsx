@@ -153,13 +153,29 @@ function ViewToggles() {
   const bestiary = useStore((s) => s.mode === "bestiary");
   // Speak mode's screen is Chinese; the other modes keep their English labels
   const zh = useStore((s) => s.mode === "speak");
+  // what each one draws, for the pointer: on the face in Speak, on the head elsewhere
+  const say = zh
+    ? {
+        threeD: "把矢面换成可以转动的人头（3D）",
+        pressure: "声道的每一节横截面按声压上色：越热，那一节里的空气振动越强",
+        particles: "画出声门与湍流处的气流粒子",
+        calipers: "在最窄处画一把卡尺，读出那里的开度（cm²）或 CLOSED",
+        grid: "画出声道每一节的横截面（一条条横线，像尺子的刻度）",
+      }
+    : {
+        threeD: "The midsagittal head, as a 3D head you can turn",
+        pressure: "Colour every cross-section of the airway by sound pressure: hotter is louder",
+        particles: "Particles of the airflow at the glottis and in the turbulence",
+        calipers: "A caliper at the narrowest place, reading its area (cm²) or CLOSED",
+        grid: "Draw every cross-section of the airway (a ladder of lines, like ruler marks)",
+      };
   return (
     <div className="view-toggles">
-      {!bestiary && <Toggle label="3D" checked={view.threeD} onChange={(v) => setView({ threeD: v })} />}
-      <Toggle label={zh ? "声压" : "Sound pressure"} checked={view.pressure} onChange={(v) => setView({ pressure: v })} />
-      {!bestiary && <Toggle label={zh ? "气流" : "Airflow"} checked={view.particles} onChange={(v) => setView({ particles: v })} />}
-      <Toggle label={bestiary ? "Labels" : zh ? "测量" : "Measurements"} checked={view.calipers} onChange={(v) => setView({ calipers: v })} />
-      {!bestiary && <Toggle label={zh ? "网格" : "Grid"} checked={view.grid} onChange={(v) => setView({ grid: v })} />}
+      {!bestiary && <Toggle label="3D" title={say.threeD} checked={view.threeD} onChange={(v) => setView({ threeD: v })} />}
+      <Toggle label={zh ? "声压" : "Sound pressure"} title={say.pressure} checked={view.pressure} onChange={(v) => setView({ pressure: v })} />
+      {!bestiary && <Toggle label={zh ? "气流" : "Airflow"} title={say.particles} checked={view.particles} onChange={(v) => setView({ particles: v })} />}
+      <Toggle label={bestiary ? "Labels" : zh ? "测量" : "Measurements"} title={say.calipers} checked={view.calipers} onChange={(v) => setView({ calipers: v })} />
+      {!bestiary && <Toggle label={zh ? "网格" : "Grid"} title={say.grid} checked={view.grid} onChange={(v) => setView({ grid: v })} />}
     </div>
   );
 }

@@ -9,7 +9,7 @@ use chimera::control::beat_player::BeatPlayer;
 use chimera::creatures::voice::CreatureVoice;
 use chimera::math;
 use chimera::phonetics::beatbox::{self, BeatStep};
-use chimera::phonetics::planner::{self, PhraseInput, PlanOptions};
+use chimera::phonetics::planner::{self, PhraseInput, PlanOptions, ToneScheme};
 use chimera::phonetics::sing::{self, MelismaOptions, NoteOnOptions, SongOptions, SungNote};
 use chimera::phonetics::english::EnglishG2P;
 use chimera::phonetics::guiyang::GuiyangG2P;
@@ -168,11 +168,24 @@ fn dispatch(st: &mut State, req: &Value) -> Res {
             to_json(&t)
         }
         // ---------------------------------------------------------------- planning (speech, song)
-        "planUtterance" => to_json(&planner::plan_utterance(&arg::<Vec<Segment>>(req, "segments")?, &arg::<PlanOptions>(req, "options")?)),
+        "planUtterance" => {
+            let mut o = arg::<PlanOptions>(req, "options")?;
+            if o.tone_scheme == Some(ToneScheme::Guiyang) && o.melody.is_none() {
+                o.melody = Some(st.gui.melody());
+            }
+            to_json(&planner::plan_utterance(&arg::<Vec<Segment>>(req, "segments")?, &o))
+        }
         // how many planned segments each segment becomes (a diphthong plans as its two vowels),
         // so the UI can find a word's span in a plan's timeline
         "plannedCounts" => to_json(&arg::<Vec<String>>(req, "ipa")?.iter().map(|s| planner::expand(s).map_or(1, |p| p.len())).collect::<Vec<_>>()),
-        "planPhrases" => to_json(&planner::plan_phrases(&arg::<Vec<PhraseInput>>(req, "phrases")?, &arg::<PlanOptions>(req, "options")?)),
+        "planPhrases" => {
+            // the dialect's tone contours and 变音 rules come from guiyang.rules.txt, not from the page
+            let mut o = arg::<PlanOptions>(req, "options")?;
+            if o.tone_scheme == Some(ToneScheme::Guiyang) && o.melody.is_none() {
+                o.melody = Some(st.gui.melody());
+            }
+            to_json(&planner::plan_phrases(&arg::<Vec<PhraseInput>>(req, "phrases")?, &o))
+        }
         "planSong" => to_json(&sing::plan_song(&arg::<Vec<SungNote>>(req, "notes")?, &arg::<SongOptions>(req, "options")?)),
         "planNoteOn" => to_json(&sing::plan_note_on(&arg::<Syllable>(req, "syl")?, arg(req, "midi")?, &arg::<NoteOnOptions>(req, "options")?)),
         "planNoteOff" => to_json(&sing::plan_note_off(&arg::<Syllable>(req, "syl")?, arg(req, "midi")?, arg::<BodyMix>(req, "body")?)),

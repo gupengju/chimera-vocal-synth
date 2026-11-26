@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../store.ts";
-import { speakText, speakPhrases, stopSpeaking, onPlan, currentPlan, spokenWordNow, type SpeakLang } from "../speech.ts";
+import { speakText, speakPhrases, previewText, stopSpeaking, onPlan, currentPlan, spokenWordNow, type SpeakLang } from "../speech.ts";
 import { mouthWords } from "../mouthWords.ts";
 import { tokenizeIpa } from "../../wasm/engine.ts";
 import { Slider, Toggle } from "./Controls.tsx";
@@ -34,11 +34,17 @@ const EXAMPLES: Record<SpeakLang, string[]> = {
     "这个声音是用空气模拟出来的。",
   ],
   guiyang: [
-    "国角。",
-    "夏天。",
-    "天气好。",
-    "gue2 jio2 qiw2。",
-    "li3 hao3。",
+    "明天天气好，去花溪吃牛肉粉。",
+    "你搞哪样？",
+    "我晓得。",
+    "你吃莽莽没有？",
+    "我们去赶场。",
+    "孃孃，好多钱一斤？",
+    "你住在哪点？",
+    "他咋个还没得回来？",
+    "你莫千翻。",
+    "你咋个不张我？",
+    "折耳根蛮香。",
   ],
 };
 
@@ -165,7 +171,11 @@ export function SpeakRight() {
   /** Switching language swaps only an untouched example; typed text is left alone. */
   const pickLang = (id: SpeakLang) => {
     setLang(id);
-    if (EXAMPLES[lang].includes(text) || text === "") setText(EXAMPLES[id][0]);
+    const swap = EXAMPLES[lang].includes(text) || text === "";
+    const next = swap ? EXAMPLES[id][0] : text;
+    if (swap) setText(next);
+    // the front end changed, so the score is stale even when the text did not move
+    void previewText(next, { ipa, lang: id, body, rate, f0 });
   };
   const pad = async (c: string) => {
     await start();
@@ -187,7 +197,11 @@ export function SpeakRight() {
                 </Chip>
               ))}
             </div>
+            {
+              /* the IPA toggle is commented out: text is always read as words, `ipa` stays false
             <Toggle label="文本是国际音标" checked={ipa} onChange={setIpa} />
+            */
+            }
           </>
         }
       >
@@ -233,6 +247,8 @@ export function SpeakRight() {
                   if (!ex) return;
                   setText(ex);
                   setIpa(false);
+                  // picking an example lays it out on the score at once; 朗读 is for the sound
+                  void previewText(ex, { ipa: false, lang, body, rate, f0 });
                 }}
               >
                 <option value="" disabled>
@@ -248,7 +264,7 @@ export function SpeakRight() {
           </div>
         </div>
       </Screen>
-      <Screen className="s-score" title="手势谱">
+      <Screen className="s-score" title="姿态谱">
         <ScoreView />
       </Screen>
       <Screen

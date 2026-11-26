@@ -14,6 +14,7 @@ use chimera::math::{js_max, js_min, js_round, log10};
 use chimera::phonetics::beatbox::{BEAT_PRESETS, BEAT_SOUNDS, BeatStep, beat_ready, parse_beat};
 use chimera::phonetics::english::EnglishG2P;
 use chimera::phonetics::guiyang::GuiyangG2P;
+use chimera::phonetics::guiyang_rules::Melody;
 use chimera::phonetics::mandarin::MandarinG2P;
 use chimera::phonetics::ipa::tokenize_ipa;
 use chimera::phonetics::planner::{
@@ -184,11 +185,17 @@ pub fn say(g: &EnglishG2P, text: &str, body_name: &str) -> Result<Spoken, String
 
 /// [`say`] for phrases from any front end.
 pub fn say_phrases(phrases: &[chimera::phonetics::english::Phrase], body_name: &str) -> Result<Spoken, String> {
-    say_phrases_with(phrases, body_name, None)
+    say_phrases_with(phrases, body_name, None, None)
 }
 
-/// The same, with an explicit tone scheme (Mandarin contours by default, Guiyang for 贵阳话).
-pub fn say_phrases_with(phrases: &[chimera::phonetics::english::Phrase], body_name: &str, tone: Option<ToneScheme>) -> Result<Spoken, String> {
+/// The same, with an explicit tone scheme (Mandarin contours by default, Guiyang for 贵阳话) and
+/// optionally the dialect's own contours and 变音 rules (`GuiyangG2P::melody`).
+pub fn say_phrases_with(
+    phrases: &[chimera::phonetics::english::Phrase],
+    body_name: &str,
+    tone: Option<ToneScheme>,
+    melody: Option<Melody>,
+) -> Result<Spoken, String> {
     let b = body(body_name)?;
     let f0 = text_f0(body_name);
     let shown: Vec<String> = phrases
@@ -231,6 +238,7 @@ pub fn say_phrases_with(phrases: &[chimera::phonetics::english::Phrase], body_na
             t0: 0.05,
             f0: Some(f0),
             tone_scheme: tone,
+            melody,
             ..Default::default()
         },
     );
@@ -278,7 +286,9 @@ pub fn mandarin(ctx: &Ctx, a: &[String]) -> Result<(), String> {
 pub fn guiyang(ctx: &Ctx, a: &[String]) -> Result<(), String> {
     let name = arg(a, 0, "out/guiyang");
     let text = arg(a, 1, "国 gue2 角 jio2。");
-    let s = say_phrases_with(&guiyang_g2p()?.to_phrases(text), arg(a, 2, "male"), Some(ToneScheme::Guiyang))?;
+    let g = guiyang_g2p()?;
+    let phrases = g.to_phrases(text);
+    let s = say_phrases_with(&phrases, arg(a, 2, "male"), Some(ToneScheme::Guiyang), Some(g.melody()))?;
     println!("{}", s.shown);
     let file = wav_name(name);
     ctx.write_wav(&file, &s.out)?;
