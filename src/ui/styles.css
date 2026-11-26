@@ -1331,6 +1331,12 @@ body {
   padding: 6px 16px 16px;
 }
 
+/* without the top bar (TOP_BAR = false in App.tsx) the wall takes the bar's row too, instead of
+   sitting in an `auto` row above an empty 1fr one */
+.app.no-topbar {
+  grid-template-rows: minmax(min-content, 1fr);
+}
+
 /* ---------- top bar */
 .topbar {
   gap: 18px 16px;

@@ -132,7 +132,8 @@ export const useStore = create<State>((set, get) => ({
   hold: false,
   heldNotes: [],
   view: { pressure: true, particles: true, grid: false, calipers: true, threeD: false },
-  mode: "play",
+  // opens straight into Speak (the top bar that switched modes is hidden, see App.tsx)
+  mode: "speak",
   setMode: (m) => {
     const prev = get().mode;
     if (prev === m) return;

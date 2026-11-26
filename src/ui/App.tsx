@@ -135,6 +135,18 @@ function ThemeToggle() {
   );
 }
 
+/** The top bar (brand, mode switch, body presets, volume, Start, engine load).
+ *  Hidden on request: the page opens straight into Speak. While it is off there is no mode switch,
+ *  so `.app` also gets `no-topbar` to give the wall the row the bar used to occupy.
+ *  Flip to true to bring it back. */
+const TOP_BAR = false;
+
+/** The "Start the voice" overlay that covers the face until audio is running (it also starts a
+ *  demo song or a beat in the other modes). Hidden on request: Speak's own Speak button calls
+ *  `start()` itself, so the first click starts audio just the same. Flip to true to bring it back
+ *  — without it, Play/Sing/Bestiary/Beatbox have no start button of their own. */
+const START_PROMPT = false;
+
 function ViewToggles() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
@@ -210,7 +222,7 @@ function LeftScreen() {
         {bestiary ? <CreatureView /> : mode === "speak" ? <Face slots={speechSlots} info={speechInfo} overlay={speechWords} /> : mode === "sing" ? <Face info={singInfo} overlay={singWords} /> : mode === "beatbox" ? <Face slots={beatSlots} info={beatInfo} showFormants={false} /> : <Face />}
       </Suspense>
       {mode === "beatbox" && <BeatOverlay />}
-      <StartPrompt />
+      {START_PROMPT && <StartPrompt />}
     </Screen>
   );
 }
@@ -255,8 +267,8 @@ export function App() {
 function Wall() {
   const mode = useStore((s) => s.mode);
   return (
-    <div className={`app text-colors mode-${mode}`}>
-      <TopBar />
+    <div className={`app text-colors mode-${mode}${TOP_BAR ? "" : " no-topbar"}`}>
+      {TOP_BAR && <TopBar />}
       <main className={`wall wall-${mode}`}>
         <LeftScreen />
         {mode === "play" ? <PlayRight /> : mode === "speak" ? <SpeakRight /> : mode === "sing" ? <SingRight /> : mode === "beatbox" ? <BeatboxRight /> : <BestiaryRight />}
