@@ -5,12 +5,13 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "bun run wasm && vite --host 127.0.0.1",
-    "build": "bun run wasm && tsc --noEmit && vite build",
+    "dev": "bun run data && bun run wasm && vite --host 127.0.0.1",
+    "build": "bun run data && bun run wasm && tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "bun run wasm && cargo test --workspace && bun test tests",
     "typecheck": "tsc --noEmit",
     "lint:layout": "bun run wasm && bun tools/layout-lint.ts",
+    "data": "bun tools/gzip-data.ts",
     "wasm": "cargo build -p chimera-wasm --release --target wasm32-unknown-unknown && cp target/wasm32-unknown-unknown/release/chimera_wasm.wasm src/wasm/chimera.wasm"
   },
   "dependencies": {

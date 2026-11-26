@@ -14,7 +14,7 @@ import { engine } from "../../audio/AudioEngine.ts";
 
 /** The three front ends, picked explicitly — the text is never guessed at. */
 const LANGS: { id: SpeakLang; label: string; hint: string }[] = [
-  { id: "english", label: "English", hint: "Type something for the voice to say" },
+  { id: "english", label: "英语", hint: "输入英文，例如 Hello. Can you hear me?" },
   { id: "mandarin", label: "普通话", hint: "输入汉字或拼音，例如 你好。 / ni3 hao3" },
   { id: "guiyang", label: "贵阳话", hint: "输入汉字或记法，例如 国角。 / gue2 jio2" },
 ];
@@ -43,19 +43,18 @@ const EXAMPLES: Record<SpeakLang, string[]> = {
 };
 
 // IPA pulmonic consonant chart (rows = manner, columns = place); empty cells are null
-const PLACES = ["Bilabial", "Labiodental", "Dental", "Alveolar", "Postalveolar", "Retroflex", "Palatal", "Velar", "Uvular", "Pharyngeal", "Glottal"];
+const PLACES = ["双唇", "唇齿", "齿", "齿龈", "龈后", "卷舌", "硬腭", "软腭", "小舌", "咽", "声门"];
 /** short headings for the chart's narrow columns (the full names are the cells' titles) */
-const PLACE_SHORT = ["Bilab", "Labdent", "Dental", "Alveol", "Postalv", "Retrofl", "Palatal", "Velar", "Uvular", "Pharyn", "Glottal"];
-const MANNER_SHORT: Record<string, string> = { "Lateral fricative": "Lat fric", Approximant: "Approx" };
+const MANNER_SHORT: Record<string, string> = { 边擦音: "边擦" };
 const CHART: [string, (string | null)[][]][] = [
-  ["Plosive", [["p", "b"], [null, null], [null, null], ["t", "d"], [null, null], ["ʈ", "ɖ"], ["c", "ɟ"], ["k", "g"], ["q", "ɢ"], [null, null], ["ʔ", null]]],
-  ["Nasal", [[null, "m"], [null, "ɱ"], [null, null], [null, "n"], [null, null], [null, "ɳ"], [null, "ɲ"], [null, "ŋ"], [null, "ɴ"], [null, null], [null, null]]],
-  ["Trill", [[null, "ʙ"], [null, null], [null, null], [null, "r"], [null, null], [null, null], [null, null], [null, null], [null, "ʀ"], [null, null], [null, null]]],
-  ["Tap", [[null, null], [null, null], [null, null], [null, "ɾ"], [null, null], [null, "ɽ"], [null, null], [null, null], [null, null], [null, null], [null, null]]],
-  ["Fricative", [["ɸ", "β"], ["f", "v"], ["θ", "ð"], ["s", "z"], ["ʃ", "ʒ"], ["ʂ", "ʐ"], ["ç", "ʝ"], ["x", "ɣ"], ["χ", "ʁ"], ["ħ", "ʕ"], ["h", "ɦ"]]],
-  ["Lateral fricative", [[null, null], [null, null], [null, null], ["ɬ", "ɮ"], [null, null], [null, null], [null, null], [null, null], [null, null], [null, null], [null, null]]],
-  ["Approximant", [[null, null], [null, "ʋ"], [null, null], [null, "ɹ"], [null, null], [null, "ɻ"], [null, "j"], [null, "ɰ"], [null, null], [null, null], [null, null]]],
-  ["Lateral", [[null, null], [null, null], [null, null], [null, "l"], [null, null], [null, "ɭ"], [null, "ʎ"], [null, null], [null, null], [null, null], [null, null]]],
+  ["塞音", [["p", "b"], [null, null], [null, null], ["t", "d"], [null, null], ["ʈ", "ɖ"], ["c", "ɟ"], ["k", "g"], ["q", "ɢ"], [null, null], ["ʔ", null]]],
+  ["鼻音", [[null, "m"], [null, "ɱ"], [null, null], [null, "n"], [null, null], [null, "ɳ"], [null, "ɲ"], [null, "ŋ"], [null, "ɴ"], [null, null], [null, null]]],
+  ["颤音", [[null, "ʙ"], [null, null], [null, null], [null, "r"], [null, null], [null, null], [null, null], [null, null], [null, "ʀ"], [null, null], [null, null]]],
+  ["闪音", [[null, null], [null, null], [null, null], [null, "ɾ"], [null, null], [null, "ɽ"], [null, null], [null, null], [null, null], [null, null], [null, null]]],
+  ["擦音", [["ɸ", "β"], ["f", "v"], ["θ", "ð"], ["s", "z"], ["ʃ", "ʒ"], ["ʂ", "ʐ"], ["ç", "ʝ"], ["x", "ɣ"], ["χ", "ʁ"], ["ħ", "ʕ"], ["h", "ɦ"]]],
+  ["边擦音", [[null, null], [null, null], [null, null], ["ɬ", "ɮ"], [null, null], [null, null], [null, null], [null, null], [null, null], [null, null], [null, null]]],
+  ["近音", [[null, null], [null, "ʋ"], [null, null], [null, "ɹ"], [null, null], [null, "ɻ"], [null, "j"], [null, "ɰ"], [null, null], [null, null], [null, null]]],
+  ["边音", [[null, null], [null, null], [null, null], [null, "l"], [null, null], [null, "ɭ"], [null, "ʎ"], [null, null], [null, null], [null, null], [null, null]]],
 ];
 
 /** the segment sounding now in the current utterance */
@@ -72,12 +71,12 @@ export const speechWords = mouthWords(spokenWordNow, V.white);
 
 export const speechSlots: SlotsFn = (_m, a, f) => {
   const sound = soundingSegment();
-  const lips = a.lipAp < 0.05 ? "Closed" : a.lipWidth < 0.55 ? "Round" : a.lipAp > 1.3 ? "Open" : "Spread";
+  const lips = a.lipAp < 0.05 ? "闭合" : a.lipWidth < 0.55 ? "圆唇" : a.lipAp > 1.3 ? "张开" : "展唇";
   return [
-    sound ? { label: "Sound", value: sound, color: V.green, ipa: true } : { label: "Sound", value: "-", color: V.green },
-    { label: "Jaw", value: a.jaw.toFixed(1), unit: "cm", color: V.red },
-    { label: "Lips", value: lips, color: V.pink },
-    { label: "Soft palate", value: f.velumPort > 0.02 ? "Open" : "Shut", color: V.white },
+    sound ? { label: "发音", value: sound, color: V.green, ipa: true } : { label: "发音", value: "-", color: V.green },
+    { label: "下颌", value: a.jaw.toFixed(1), unit: "cm", color: V.red },
+    { label: "唇形", value: lips, color: V.pink },
+    { label: "软腭", value: f.velumPort > 0.02 ? "开" : "闭", color: V.white },
   ];
 };
 
@@ -85,12 +84,12 @@ export const speechSlots: SlotsFn = (_m, a, f) => {
 export const speechInfo: InfoFn = (m, _f, tele) => {
   if (!tele) return [];
   const t = tele.t;
-  const out = [t.voicing > 0.3 ? `Voiced ${t.f0.toFixed(0)} Hz` : "Voiceless"];
+  const out = [t.voicing > 0.3 ? `浊音 ${t.f0.toFixed(0)} Hz` : "清音"];
   if (t.noiseLevel > 1 && t.noiseNode >= 0) {
     const s = m.branchS(t.noiseNode, t.phLen, t.orLen);
-    if (s >= 0) out.push(`Noise at ${s.toFixed(1)} cm`);
+    if (s >= 0) out.push(`噪声在 ${s.toFixed(1)} cm`);
   }
-  out.push(`Lungs ${t.pLung.toFixed(1)} cmH₂O`);
+  out.push(`肺压 ${t.pLung.toFixed(1)} cmH₂O`);
   return out;
 };
 
@@ -106,9 +105,9 @@ function ConsonantChart(props: { onPad: (c: string) => void }) {
         <thead>
           <tr>
             <th />
-            {PLACES.map((p, i) => (
+            {PLACES.map((p) => (
               <th key={p} scope="col" title={p} aria-label={p}>
-                {PLACE_SHORT[i]}
+                {p}
               </th>
             ))}
           </tr>
@@ -123,7 +122,7 @@ function ConsonantChart(props: { onPad: (c: string) => void }) {
                 <td key={i}>
                   {pair.map((sym, j) =>
                     sym ? (
-                      <button key={j} className={`ipa${sym === now ? " now" : ""}`} onClick={() => props.onPad(sym)} title={`Say it between two vowels`}>
+                      <button key={j} className={`ipa${sym === now ? " now" : ""}`} onClick={() => props.onPad(sym)} title={`在两个元音之间读它`}>
                         {sym}
                       </button>
                     ) : (
@@ -177,18 +176,18 @@ export function SpeakRight() {
     <div className="right right-speak">
       <Screen
         className="s-say"
-        title="Say"
-        sub="Text to speech"
+        title="朗读"
+        sub="文本转语音"
         tools={
           <>
-            <div className="lang-pick" role="group" aria-label="Language">
+            <div className="lang-pick" role="group" aria-label="语言">
               {LANGS.map((l) => (
                 <Chip key={l.id} on={!ipa && lang === l.id} onClick={() => pickLang(l.id)} disabled={ipa}>
                   {l.label}
                 </Chip>
               ))}
             </div>
-            <Toggle label="Text is IPA" checked={ipa} onChange={setIpa} />
+            <Toggle label="文本是国际音标" checked={ipa} onChange={setIpa} />
           </>
         }
       >
@@ -203,31 +202,31 @@ export function SpeakRight() {
               }}
               rows={2}
               spellCheck={!ipa}
-              aria-label={ipa ? "IPA to speak" : "Text to speak"}
-              placeholder={ipa ? "Type IPA, for example ˈhɛloʊ" : (LANGS.find((l) => l.id === lang)?.hint ?? "")}
+              aria-label={ipa ? "要读的国际音标" : "要朗读的文字"}
+              placeholder={ipa ? "输入国际音标，例如 ˈhɛloʊ" : (LANGS.find((l) => l.id === lang)?.hint ?? "")}
             />
             <div className="say-actions">
               <button className="primary" onClick={() => void speak()} disabled={busy}>
-                {busy ? "Preparing…" : "Speak"}
+                {busy ? "准备中…" : "朗读"}
               </button>
               <button className="ghost" onClick={stopSpeaking}>
-                Stop
+                停止
               </button>
             </div>
           </div>
           <div className="say-row">
             <p className="transcription" aria-live="polite">
-              {trans ? `/${trans}/` : "The transcription appears here."}
+              {trans ? `/${trans}/` : "转写会显示在这里。"}
             </p>
             <div className="say-rate">
-              <Slider label="Rate" value={rate} min={0.5} max={1.8} onChange={setRate} format={(v) => `${v.toFixed(2)}×`} />
+              <Slider label="语速" value={rate} min={0.5} max={1.8} onChange={setRate} format={(v) => `${v.toFixed(2)}×`} />
             </div>
           </div>
-          <div className="examples" role="group" aria-label="Examples">
+          <div className="examples" role="group" aria-label="例句">
             <label className="example-pick">
-              <span className="example-pick-label">Examples</span>
+              <span className="example-pick-label">例句</span>
               <select
-                aria-label="Pick an example"
+                aria-label="选一个例句"
                 value=""
                 onChange={(e) => {
                   const ex = e.target.value;
@@ -237,7 +236,7 @@ export function SpeakRight() {
                 }}
               >
                 <option value="" disabled>
-                  Choose an example…
+                  选一个例句…
                 </option>
                 {EXAMPLES[lang].map((ex) => (
                   <option key={ex} value={ex}>
@@ -249,15 +248,15 @@ export function SpeakRight() {
           </div>
         </div>
       </Screen>
-      <Screen className="s-score" title="Gestural score">
+      <Screen className="s-score" title="手势谱">
         <ScoreView />
       </Screen>
       <Screen
         className="s-chart"
-        title="Consonants"
-        sub="Between two vowels"
+        title="辅音"
+        sub="夹在两个元音之间"
         tools={
-          <div className="vowel-pick" role="group" aria-label="Vowel around it">
+          <div className="vowel-pick" role="group" aria-label="周围的元音">
             {["ɑ", "i", "u", "ə"].map((v) => (
               <Chip key={v} on={vowel === v} onClick={() => setVowel(v)} className="ipa-chip">
                 {v}
@@ -268,11 +267,11 @@ export function SpeakRight() {
       >
         <ConsonantChart onPad={(c) => void pad(c)} />
       </Screen>
-      <Screen className="s-tube" title="Tube" sub="Glottis to lips">
-        <TubeView />
+      <Screen className="s-tube" title="声道管" sub="从声门到唇">
+        <TubeView zh />
       </Screen>
-      <Screen className="s-folds" title="Vocal folds" sub="Slowed 100×">
-        <Stroboscope />
+      <Screen className="s-folds" title="声带" sub="慢放 100 倍">
+        <Stroboscope zh />
       </Screen>
     </div>
   );

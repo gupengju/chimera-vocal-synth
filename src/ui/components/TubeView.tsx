@@ -10,9 +10,12 @@ import { beam, beamPts, label, seg, type Pt } from "../render/vector.ts";
 /**
  * The simulated tube as a wireframe: one ring per section (diameter from the area function),
  * lit by acoustic pressure, with the nasal branch above the velum junction.
+ * `zh` writes its annotations in Chinese (Speak mode); Play keeps them in English.
  */
-export function TubeView() {
+export function TubeView({ zh = false }: { zh?: boolean } = {}) {
   const model = useModel();
+  /** width of an annotation: a CJK glyph is a full em, a Latin one about 0.78 em */
+  const textW = (s: string) => Array.from(s).reduce((a, ch) => a + (/[\u2e80-\u9fff\uf900-\ufaff]/.test(ch) ? 1 : 0.78) * 9, 0);
   const ref = usePhosphor(({ ctx, w, h }) => {
     const st = useStore.getState();
     const m = model.current;
@@ -60,8 +63,14 @@ export function TubeView() {
       p.lineTo(jx + nLen, nTop + off);
       beam(ctx, p, nc, 1, { dash });
     }
-    label(ctx, "NOSE", jx + nLen + 6, nTop + 3, { size: 9, color: TEXT.secondary, ls: 0.16 });
-    label(ctx, open ? `VELUM OPEN ${velum.toFixed(2)} CM²` : "VELUM SHUT", jx, nTop - 12, { size: 9, color: TEXT.secondary, ls: 0.16, align: "center" });
+    label(ctx, zh ? "鼻" : "NOSE", jx + nLen + 6, nTop + 3, { size: 9, color: TEXT.secondary, ls: 0.16 });
+    label(
+      ctx,
+      open ? (zh ? `软腭开 ${velum.toFixed(2)} cm²` : `VELUM OPEN ${velum.toFixed(2)} CM²`) : zh ? "软腭闭合" : "VELUM SHUT",
+      jx,
+      nTop - 12,
+      { size: 9, color: TEXT.secondary, ls: zh ? 0.06 : 0.16, align: "center" },
+    );
 
     // silhouette and rings
     const top: Pt[] = [[x0, axisY - 3], ...secs.map((q) => [q.x, axisY - q.r] as Pt), [x1, axisY - secs[secs.length - 1].r]];
@@ -78,17 +87,26 @@ export function TubeView() {
 
     // landmarks
     const f = m.frame(tele ? VoiceModel.articFromArray(tele.t.artic) : st.artic);
-    const marks: [number, string][] = [[0, "GLOTTIS"], [phLen, "VELUM"], [f.teethS, "TEETH"], [total, "LIPS"]];
+    const marks: [number, string][] = zh
+      ? [[0, "声门"], [phLen, "软腭"], [f.teethS, "齿"], [total, "唇"]]
+      : [[0, "GLOTTIS"], [phLen, "VELUM"], [f.teethS, "TEETH"], [total, "LIPS"]];
     let lastRight = -Infinity;
     for (const [s, name] of marks) {
       const x = x0 + s * sx;
-      const tw = name.length * 9 * 0.78;
+      const tw = textW(name);
       const lx = Math.min(w - tw - 2, Math.max(2, x - tw / 2));
-      if (lx < lastRight + 8) continue;
+      if (lx < lastRight + (zh ? 12 : 8)) continue;
       lastRight = lx + tw;
       seg(ctx, x, h - 26, x, h - 21, V.blueDim, 1);
-      label(ctx, name, lx, h - 9, { size: 9, color: TEXT.secondary, ls: 0.16 });
+      label(ctx, name, lx, h - 9, { size: 9, color: TEXT.secondary, ls: zh ? 0.06 : 0.16 });
     }
   });
-  return <canvas ref={ref} className="instrument-canvas" aria-label="Area function of the simulated tube, lit by sound pressure" role="img" />;
+  return (
+    <canvas
+      ref={ref}
+      className="instrument-canvas"
+      aria-label={zh ? "模拟声道管的面积函数，按声压点亮" : "Area function of the simulated tube, lit by sound pressure"}
+      role="img"
+    />
+  );
 }

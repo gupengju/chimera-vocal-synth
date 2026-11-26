@@ -9,8 +9,9 @@ import { beam, beamPts, label, labelBlock, ring, seg, type Pt } from "../render/
 /**
  * The vocal folds from above, as through an endoscope, replayed slowly from the phase-locked
  * glottal area trace (two cycles), with the area (white) and flow (amber) waveforms and a playhead.
+ * `zh` writes its annotations in Chinese (Speak mode); Play keeps them in English.
  */
-export function Stroboscope() {
+export function Stroboscope({ zh = false }: { zh?: boolean } = {}) {
   const phase = useRef(0);
   const ref = usePhosphor(({ ctx, w, h, dt }) => {
     const st = useStore.getState();
@@ -57,15 +58,15 @@ export function Stroboscope() {
     epi.moveTo(cx - R * 0.42, cy - R * 0.62);
     epi.quadraticCurveTo(cx, cy - R * 0.98, cx + R * 0.42, cy - R * 0.62);
     beam(ctx, epi, V.blueMid, 1.2);
-    label(ctx, "FRONT", cx, cy - R - 8, { size: 8, color: TEXT.secondary, align: "center", ls: 0.18 });
+    label(ctx, zh ? "前" : "FRONT", cx, cy - R - 8, { size: 8, color: TEXT.secondary, align: "center", ls: 0.18 });
 
     // waveforms
     const tx0 = cx + R + 22, tx1 = w - 12;
     if (tx1 - tx0 < 40) return;
     const bandH = Math.max(12, (h - 52) / 2);
     const yA0 = 16, yA1 = yA0 + bandH, yF0 = yA1 + 18, yF1 = yF0 + bandH;
-    label(ctx, "AREA", tx1, yA0 - 4, { size: 9, color: TEXT.secondary, align: "right", ls: 0.18 });
-    label(ctx, "FLOW", tx1, yF0 - 4, { size: 9, color: TEXT.secondary, align: "right", ls: 0.18 });
+    label(ctx, zh ? "面积" : "AREA", tx1, yA0 - 4, { size: 9, color: TEXT.secondary, align: "right", ls: zh ? 0.06 : 0.18 });
+    label(ctx, zh ? "流量" : "FLOW", tx1, yF0 - 4, { size: 9, color: TEXT.secondary, align: "right", ls: zh ? 0.06 : 0.18 });
     seg(ctx, tx0, yA1, tx1, yA1, V.frame, 1);
     seg(ctx, tx0, yF1, tx1, yF1, V.frame, 1);
     if (area && flow && n > 1) {
@@ -85,12 +86,23 @@ export function Stroboscope() {
       seg(ctx, px, yA0, px, yF1, V.white, 1, { alpha: 0.55, dash: [2, 3] });
       let opened = 0;
       for (let i = 0; i < n; i++) if (area[i] > minA + 0.002) opened++;
-      label(ctx, `OPEN ${Math.round((opened / n) * 100)}%`, tx0, h - 4, { size: 9, color: TEXT.secondary, ls: 0.16 });
+      label(ctx, `${zh ? "开相" : "OPEN"} ${Math.round((opened / n) * 100)}%`, tx0, h - 4, { size: 9, color: TEXT.secondary, ls: zh ? 0.06 : 0.16 });
       label(ctx, `${(a * 100).toFixed(1)} MM²`, tx1, h - 4, { size: 9, color: TEXT.secondary, align: "right", ls: 0.12 });
     } else {
       // in the area band, clear of the FLOW label below it
-      labelBlock(ctx, "START AUDIO TO SEE THEM VIBRATE", tx0, (yA0 + yA1) / 2, tx1 - tx0, { size: 9, color: TEXT.secondary, ls: 0.16 });
+      labelBlock(ctx, zh ? "开始发声后才能看到它们振动" : "START AUDIO TO SEE THEM VIBRATE", tx0, (yA0 + yA1) / 2, tx1 - tx0, {
+        size: 9,
+        color: TEXT.secondary,
+        ls: zh ? 0.06 : 0.16,
+      });
     }
   });
-  return <canvas ref={ref} className="instrument-canvas" aria-label="Vocal folds seen from above, replayed slowly, with the glottal area and flow" role="img" />;
+  return (
+    <canvas
+      ref={ref}
+      className="instrument-canvas"
+      aria-label={zh ? "从上方看声带，慢放，配声门面积与流量曲线" : "Vocal folds seen from above, replayed slowly, with the glottal area and flow"}
+      role="img"
+    />
+  );
 }

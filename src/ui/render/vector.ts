@@ -150,13 +150,30 @@ export function labelWidth(ctx: CanvasRenderingContext2D, text: string, o: Label
   return wd;
 }
 
-/** Words of a label broken into lines no wider than maxW. */
+/** Words of a label broken into lines no wider than maxW; a single word wider than maxW (an unspaced Chinese sentence) breaks between characters. */
 export function wrapLabel(ctx: CanvasRenderingContext2D, text: string, maxW: number, o: LabelOpts = {}): string[] {
   const lines: string[] = [];
-  for (const word of text.split(/\s+/)) {
-    const last = lines[lines.length - 1];
-    if (last !== undefined && labelWidth(ctx, `${last} ${word}`, o) <= maxW) lines[lines.length - 1] = `${last} ${word}`;
-    else lines.push(word);
+  const fits = (s: string) => labelWidth(ctx, s, o) <= maxW;
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const last = lines.length ? lines[lines.length - 1] : null;
+    const joined = last === null ? word : `${last} ${word}`;
+    if (last !== null && fits(joined)) {
+      lines[lines.length - 1] = joined;
+      continue;
+    }
+    if (fits(word)) {
+      lines.push(word);
+      continue;
+    }
+    let cur = last ?? "";
+    if (last !== null) lines.pop();
+    for (const ch of Array.from(word)) {
+      if (cur !== "" && !fits(cur + ch)) {
+        lines.push(cur);
+        cur = ch;
+      } else cur += ch;
+    }
+    if (cur !== "") lines.push(cur);
   }
   return lines;
 }

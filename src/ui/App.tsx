@@ -21,7 +21,7 @@ import { playDemo, DEMO_SONGS } from "./singing.ts";
 import type { Mode } from "./store.ts";
 import type { BodyName } from "../worklet/protocol.ts";
 import { BodyPad } from "./components/BodyPad.tsx";
-import { bodyLabel, presetOf, PRESETS } from "./body.ts";
+import { bodyLabel, bodyLabelZh, presetOf, PRESETS } from "./body.ts";
 
 // three.js only loads when the 3D view is first shown
 const AnatomyView3D = lazy(() => import("./components/AnatomyView3D.tsx").then((m) => ({ default: m.AnatomyView3D })));
@@ -151,13 +151,15 @@ function ViewToggles() {
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
   const bestiary = useStore((s) => s.mode === "bestiary");
+  // Speak mode's screen is Chinese; the other modes keep their English labels
+  const zh = useStore((s) => s.mode === "speak");
   return (
     <div className="view-toggles">
       {!bestiary && <Toggle label="3D" checked={view.threeD} onChange={(v) => setView({ threeD: v })} />}
-      <Toggle label="Sound pressure" checked={view.pressure} onChange={(v) => setView({ pressure: v })} />
-      {!bestiary && <Toggle label="Airflow" checked={view.particles} onChange={(v) => setView({ particles: v })} />}
-      <Toggle label={bestiary ? "Labels" : "Measurements"} checked={view.calipers} onChange={(v) => setView({ calipers: v })} />
-      {!bestiary && <Toggle label="Grid" checked={view.grid} onChange={(v) => setView({ grid: v })} />}
+      <Toggle label={zh ? "声压" : "Sound pressure"} checked={view.pressure} onChange={(v) => setView({ pressure: v })} />
+      {!bestiary && <Toggle label={zh ? "气流" : "Airflow"} checked={view.particles} onChange={(v) => setView({ particles: v })} />}
+      <Toggle label={bestiary ? "Labels" : zh ? "测量" : "Measurements"} checked={view.calipers} onChange={(v) => setView({ calipers: v })} />
+      {!bestiary && <Toggle label={zh ? "网格" : "Grid"} checked={view.grid} onChange={(v) => setView({ grid: v })} />}
     </div>
   );
 }
@@ -208,14 +210,15 @@ function LeftScreen() {
   const body = useStore((s) => s.body);
   const threeD = useStore((s) => s.view.threeD);
   const bestiary = mode === "bestiary";
+  const zh = mode === "speak";
   const Face = threeD ? AnatomyView3D : AnatomyView;
   return (
     <Screen
       className="left"
       focus
-      title={bestiary ? "Creature" : "Vocal tract"}
-      sub={bestiary ? "Airway / live" : `${bodyLabel(body)} / ${threeD ? "3D" : "midsagittal"}`}
-      label={bestiary ? "Live creature airway" : "Live vocal tract"}
+      title={bestiary ? "Creature" : zh ? "声道" : "Vocal tract"}
+      sub={bestiary ? "Airway / live" : `${zh ? bodyLabelZh(body) : bodyLabel(body)} / ${threeD ? "3D" : zh ? "中矢面" : "midsagittal"}`}
+      label={bestiary ? "Live creature airway" : zh ? "实时声道" : "Live vocal tract"}
       tools={<ViewToggles />}
     >
       <Suspense fallback={null}>

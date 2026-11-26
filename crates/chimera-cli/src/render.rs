@@ -63,8 +63,9 @@ pub fn mandarin_g2p() -> Result<MandarinG2P, String> {
     Ok(g)
 }
 
-/// The Guiyang dictionary (`public/data/guiyang.txt.gz`) loaded into a G2P, with the notation
-/// tables read from `public/data/guiyang.rules.txt` at run time (edit the file, rerun, hear it).
+/// The Guiyang dictionary loaded into a G2P, with the notation tables read from
+/// `public/data/guiyang.rules.txt` and the wordlist from `public/data/guiyang.txt` at run time
+/// (edit either file, rerun, hear it; the `.txt.gz` beside it is the same text packed).
 pub fn guiyang_g2p() -> Result<GuiyangG2P, String> {
     let mut g = GuiyangG2P::new();
     let rules = repo_path("public/data/guiyang.rules.txt");
@@ -73,7 +74,13 @@ pub fn guiyang_g2p() -> Result<GuiyangG2P, String> {
         // a build without public/ still speaks, on the copy embedded at compile time
         Err(e) => eprintln!("{rules}: {e}; using the embedded tables (they may be stale)"),
     }
-    g.load_dict(&gunzip("public/data/guiyang.txt.gz")?);
+    // the editable wordlist first, so an edit needs no gzip step; `bun run data` packs it
+    let dict = repo_path("public/data/guiyang.txt");
+    let text = match std::fs::read_to_string(&dict) {
+        Ok(text) => text,
+        Err(_) => gunzip("public/data/guiyang.txt.gz")?,
+    };
+    g.load_dict(&text);
     Ok(g)
 }
 

@@ -20,9 +20,11 @@ Every reading is converted to the project's 贵阳记法 by `dialect17277/build_
 
 产出三个文件，主表是 `词形<TAB>读音`：
 
-  * `public/data/guiyang.txt.gz` — **全部**读音，一个读音一行，语料顺序（同形可多行，单字在前、
+  * `public/data/guiyang.txt` — **全部**读音，一个读音一行，语料顺序（同形可多行，单字在前、
     词汇在后，同音字表补在最后），首行即默认读音。多音/多说法一律平铺，不分白/文，也不做
     义项分类。Rust / C++ 两端装载「先出现者胜」，多行不互相覆盖，词条按最长匹配生效。
+    纯文本直接改；`bun run data`（`bun run dev` / `bun run build` 都会先跑它）压出同目录的
+    `guiyang.txt.gz` 供页面装载。
   * `public/data/guiyang_readings.csv` — 逐条溯源：词形/读音/IPA/编号/来源/词汇/注例/默认。
   * `public/data/guiyang_unresolved.csv` — 只有 `#n`（本字未定）的 7 条，等补本字后再进表。
 
@@ -32,7 +34,6 @@ Usage:
 """
 import argparse
 import csv
-import gzip
 import pathlib
 import sys
 from collections import Counter
@@ -132,7 +133,7 @@ def main() -> None:
     ap.add_argument("corpus", nargs="?", default=str(CORPUS_DIR / "audio16k_danzi.json"))
     ap.add_argument("--words", default=str(CORPUS_DIR / "audio16k_cihui.json"))
     ap.add_argument("--tongyin", default=str(CORPUS_DIR / "guiyang_tongyinzi_shiwen.txt"))
-    ap.add_argument("-o", "--out", default=str(ROOT / "public/data/guiyang.txt.gz"))
+    ap.add_argument("-o", "--out", default=str(ROOT / "public/data/guiyang.txt"))
     ap.add_argument("--csv", default=str(ROOT / "public/data/guiyang_readings.csv"))
     ap.add_argument("--unresolved", default=str(ROOT / "public/data/guiyang_unresolved.csv"))
     ap.add_argument("--books", default=str(CORPUS_DIR / "books4_guiyang.tsv"),
@@ -190,7 +191,8 @@ def main() -> None:
         add(form, note, ipa, rec, "同音字表", skip_dupe=True)
         book_keys.add(form)
 
-    _write_gz(a.out, [f"{k}\t{v}\n" for k, v in multi])
+    _write_text(a.out, [f"{k}\t{v}\n" for k, v in multi])
+    print(f"词表 {len(multi)} 行 → {a.out}（`bun run data` 会把它压成 .txt.gz）")
 
     with open(a.csv, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_FIELDS, lineterminator="\n")
@@ -222,9 +224,9 @@ def main() -> None:
     return 0
 
 
-def _write_gz(path: str, lines: list[str]) -> None:
-    with gzip.GzipFile(path, "wb", mtime=0) as f:
-        f.write("".join(lines).encode("utf-8"))
+def _write_text(path: str, lines: list[str]) -> None:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("".join(lines))
 
 
 if __name__ == "__main__":

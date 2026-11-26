@@ -58,7 +58,7 @@ async function run(viewport: { width: number; height: number }, tag: string) {
   // speak mode
   await page.getByRole("radio", { name: "Speak" }).click();
   await page.waitForTimeout(200);
-  await page.getByRole("button", { name: /^Speak$/ }).click();
+  await page.getByRole("button", { name: /^朗读$/ }).click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${outDir}/${tag}-3-speak.png`, fullPage: true });
   const trans = await page.locator(".transcription").textContent();

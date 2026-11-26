@@ -3,7 +3,7 @@
  * dictionary, its 55/21/42/13 tone contours in the plan, and the explicit three-language pick.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { initEngine } from "./harness.ts";
 
@@ -11,7 +11,11 @@ await initEngine();
 const { GuiyangG2P, isGuiyang, isMandarin, planPhrases } = await import("../src/wasm/engine.ts");
 const { transcribe } = await import("../src/ui/words.ts");
 const gy = new GuiyangG2P();
-gy.setDictionaryText(gunzipSync(readFileSync(new URL("../public/data/guiyang.txt.gz", import.meta.url))).toString());
+// 词表按当前文件加载：可编辑的 guiyang.txt 优先，只有压缩件时才解 gz
+const dictPath = new URL("../public/data/guiyang.txt", import.meta.url);
+gy.setDictionaryText(
+  existsSync(dictPath) ? readFileSync(dictPath).toString() : gunzipSync(readFileSync(new URL("../public/data/guiyang.txt.gz", import.meta.url))).toString(),
+);
 // 规则表按当前文件加载（引擎里那份是编译时嵌入的同一份，可能落后于刚编辑过的文件）
 gy.setRulesText(readFileSync(new URL("../public/data/guiyang.rules.txt", import.meta.url)).toString());
 const male = { female: 0, child: 0 };

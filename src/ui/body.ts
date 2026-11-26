@@ -15,6 +15,10 @@ export const PRESETS: Record<BodyName, BodyMix> = {
 
 export const PRESET_LABEL: Record<BodyName, string> = { male: "Adult male", female: "Adult female", child: "Child" };
 
+/** the same, for Speak mode's Chinese panel */
+const PRESET_ZH: Record<BodyName, string> = { male: "成年男声", female: "成年女声", child: "儿童" };
+const BODY_ZH: Record<BodyName, string> = { male: "男声", female: "女声", child: "儿童" };
+
 const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
 /** Weights of male, female and child (as the engine computes them; they sum to 1). */
@@ -60,5 +64,15 @@ export function bodyLabel(b: BodyMix): string {
   const parts = bodyWeights(b)
     .filter(([, w]) => w > 0.005)
     .map(([n, w]) => `${n[0].toUpperCase()}${n.slice(1)} ${Math.round(w * 100)}`);
+  return `${parts.join(" · ")} %`;
+}
+
+/** The same label in Chinese ("成年女声", "男声 40 · 女声 30 · 儿童 30 %"), for Speak mode's panel. */
+export function bodyLabelZh(b: BodyMix): string {
+  const p = presetOf(b);
+  if (p) return PRESET_ZH[p];
+  const parts = bodyWeights(b)
+    .filter(([, w]) => w > 0.005)
+    .map(([n, w]) => `${BODY_ZH[n]} ${Math.round(w * 100)}`);
   return `${parts.join(" · ")} %`;
 }

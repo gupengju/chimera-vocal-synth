@@ -63,7 +63,12 @@ export function tokenizeIpa(text: string): Segment[] {
 /** A gzipped dictionary as text. */
 async function fetchDictionary(url: string): Promise<string> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`dictionary ${res.status}`);
+  if (!res.ok) {
+    // a checkout that has only the editable text: read guiyang.txt beside the gzip
+    const plain = url.replace(/\.gz$/, "");
+    if (plain !== url) return fetchDictionary(plain);
+    throw new Error(`dictionary ${res.status}`);
+  }
   const bytes = new Uint8Array(await res.arrayBuffer());
   // servers differ: some send Content-Encoding: gzip (already inflated by the browser)
   if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
